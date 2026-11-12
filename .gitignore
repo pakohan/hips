@@ -7,9 +7,15 @@
 /.idea/workspace.xml
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
+/.idea/deploymentTargetSelector.xml
 .DS_Store
 /build
 /captures
 .externalNativeBuild
 .cxx
 local.properties
+
+# Python proof of concept: environment and everything it generates (fonts, datasets, model, PDFs)
+/poc/.venv
+/poc/build
+__pycache__/
