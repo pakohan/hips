@@ -4,6 +4,7 @@ Every page goes through the same PDF writer, camera simulation and segmentation 
 Lines whose symbol count differs from the text are dropped (and counted).
 
 Usage: 02_make_dataset.py <name> <pages> <seed> [min_x_height max_x_height]
+Environment: HIPS_BUILD (build directory), HIPS_SIZE (text size in points), HIPS_PRINTER_DPI.
 """
 
 import sys
@@ -15,7 +16,7 @@ import numpy as np
 from hips import fonts, pdf, pipeline, segment
 from hips.text import CARRIERS, random_text
 
-SIZE = 11.0
+SIZE = pipeline.TEXT_SIZE
 WIDTH = 300.0
 
 
@@ -28,7 +29,7 @@ def make_page(args: tuple[int, int, float, float]) -> tuple[np.ndarray, np.ndarr
     ]
     x_height = float(rng.uniform(low, high))
     doc = pdf.write_pdf(glyphs, WIDTH, height)
-    photo = pipeline.photograph(doc, SIZE, x_height, rng, severity=float(rng.uniform(0.3, 1.3)))
+    photo = pipeline.photograph(doc, SIZE, x_height, rng, float(rng.uniform(0.3, 1.3)), pipeline.PRINTER_DPI)
     doc.close()
     page = segment.segment(photo)
     expected = pipeline.lines_of(glyphs)

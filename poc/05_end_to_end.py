@@ -1,6 +1,7 @@
 """Step 5: the whole chain. Cover PDF -> PDF with a hidden message -> simulated photos -> message.
 
 Usage: 05_end_to_end.py [message] [trials per setting]
+Environment: HIPS_BUILD (build directory), HIPS_SIZE (text size in points), HIPS_PRINTER_DPI.
 Writes build/cover.pdf, build/encoded.pdf, build/e2e-photo-*.jpg and build/e2e-results.md.
 """
 
@@ -15,15 +16,20 @@ from hips.text import CARRIERS, SAMPLE_TEXT, class_count, class_of
 
 message = (sys.argv[1] if len(sys.argv) > 1 else "https://example.org/hips").encode()
 trials = int(sys.argv[2]) if len(sys.argv) > 2 else 20
-SIZE, WIDTH = 11.0, 300.0
+SIZE = pipeline.TEXT_SIZE
+WIDTH, HEIGHT, MARGIN = 595.0, 842.0, 50.0  # A4, so a print at 100% keeps the type size
+# x-height in a 12 MP photo (4000 px tall) that shows the whole page with a little margin.
+FULL_PAGE_X_HEIGHT = pdf.X_HEIGHT_EM * SIZE * 4000 / (HEIGHT * 1.08)
 variants = fonts.variant_count()
 codebook = pipeline.load_codebook()
 rng = np.random.default_rng(7)
 
 # 1. A cover document in the base font, as a user would bring it.
 cover_path, encoded_path = fonts.BUILD_DIR / "cover.pdf", fonts.BUILD_DIR / "encoded.pdf"
-glyphs, height = pdf.layout(SAMPLE_TEXT, SIZE, WIDTH)
-pdf.write_pdf(glyphs, WIDTH, height, cover_path)
+glyphs, height = pdf.layout(SAMPLE_TEXT, SIZE, WIDTH, MARGIN)
+if height > HEIGHT:
+    raise ValueError(f"the sample text needs {height:.0f} pt at {SIZE} pt type")
+pdf.write_pdf(glyphs, WIDTH, HEIGHT, cover_path)
 
 # 2. Read it back, compute the variants, rewrite the PDF.
 chars = [g.char for g in pdf.read_glyphs(pymupdf.open(cover_path))]
@@ -51,12 +57,12 @@ block_starts = np.cumsum([0] + [b.bits for b in blocks[:-1]])
 message_blocks = int(np.sum(block_starts < needed))  # blocks that carry message bits, not padding
 rows = ["| x-height px | severity | segmentation ok | char errors | variant accuracy | blocks wrong (hard / soft) | message ok (hard / soft) |",
         "|---|---|---|---|---|---|---|"]
-for x_height in (18, 24, 30, 36, 42):
+for x_height in (round(FULL_PAGE_X_HEIGHT * distance) for distance in (0.6, 0.8, 1.0)):
     for severity in (0.5, 1.0):
         seg_ok = hard_ok = soft_ok = 0
         char_errors = letters = letters_right = block_total = hard_blocks = soft_blocks = 0
         for trial in range(trials):
-            photo = pipeline.photograph(encoded, SIZE, x_height, rng, severity)
+            photo = pipeline.photograph(encoded, SIZE, x_height, rng, severity, pipeline.PRINTER_DPI)
             if trial == 0:
                 cv2.imwrite(str(fonts.BUILD_DIR / f"e2e-photo-{x_height}-{severity}.jpg"), photo)
             page = segment.segment(photo)

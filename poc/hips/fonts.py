@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import os
 from pathlib import Path
 
 from fontTools import subset
@@ -21,7 +22,8 @@ from fontTools.varLib import instancer
 
 POC_DIR = Path(__file__).resolve().parent.parent
 SOURCE_FONT = POC_DIR / "fonts" / "RobotoFlex.ttf"
-BUILD_DIR = POC_DIR / "build"
+# One build directory per experiment (strength, text size, printer): HIPS_BUILD=build-s15-18pt etc.
+BUILD_DIR = POC_DIR / os.environ.get("HIPS_BUILD", "build")
 FONT_DIR = BUILD_DIR / "fonts"
 
 # Axis steps around the default instance. Variant 0 is the unmodified font.

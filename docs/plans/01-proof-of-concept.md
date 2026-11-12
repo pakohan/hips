@@ -6,8 +6,9 @@ enough for a phone, when the paper comes without code, font model or codebook?
 **Answer so far (2026-11-12): yes in simulation, no on the first real print.** The full chain works on simulated
 photos. On the owner's photos and scan of a printed page, finding and naming the letters works, but the variant is
 recognised for only 26% to 49% of the letters (about 95% is needed, chance is 7%), so no message is recovered.
-The variants at strength 0.6 and 11 pt differ by about half a printer dot; see "Real photos" below. The method is
-not refuted, but the current variants are too fine for print.
+The cause is that the network has only ever seen simulated pages: after brief further training on 2500 real
+glyphs it reads 60% of held-out real glyphs (of 27 variants), up from 21%. See "Real photos" below. The method
+is not refuted; it needs real training data, and probably somewhat stronger variants or larger type.
 
 Code: `poc/` (how to run: `poc/README.md`). Decisions: ADR 0001 to 0005.
 
@@ -133,8 +134,38 @@ pixel grid is visible in the photo and dark-on-white text blooms.
 
 Taken together: every output device has a dot about as large as, or larger than, the differences we encode, and
 each shifts stroke weight globally in its own direction (laser thinner, screen thicker) by more than one step.
-Reading absolute stroke weight to a fraction of a dot cannot work. What can: differences of at least one device
-dot (larger steps or larger type), and decoding relative to the page's own average instead of absolute weight.
+A network that has only seen ideal pages cannot read that. (First conclusion here was that it cannot work at all;
+the next section corrects it.)
+
+### Second look: the print keeps the information, the simulation is what is wrong
+
+The conclusion above ("cannot work") was too strong. Three experiments on the same day:
+
+1. **Training on the simulated 300 dpi raster** (`poc/sweep_print.sh`, 300 pages, 4 epochs each). In simulation
+   the raster costs little once the network has seen it:
+
+   | Strength, size | Variant right, all 27 | Variants per letter in the codebook |
+   |---|---|---|
+   | 0.6, 11 pt | 79% | 16.9 |
+   | 2.5, 11 pt | 91% | 23.6 |
+   | 1.5, 14 pt | 91% | 24.1 |
+   | 1.5, 18 pt | 91% | 23.7 |
+
+   Simulated end to end at 1.5 / 14 pt / 300 dpi (200-byte message, full A4 page): 10/10 at 32 px x-height,
+   8/10 to 10/10 at 25 px, 2/10 to 5/10 at 19 px; every failure is segmentation, no block was decoded wrongly.
+2. **That network on the real photos**: no better (21% to 25% of 27 on the print photos, 11% on the monitor),
+   with the same bias toward thin strokes. So the one-bit raster is not what a laser printer does, and the
+   earlier agreement between "300 dpi simulation" and the real photos was partly coincidence. **Simulated
+   results say nothing reliable about paper yet**, including the table in item 1.
+3. **Fine-tuning on real glyphs** (`poc/tools_real_finetune.py`): the network is trained further on the glyphs
+   of lines 1 to 16 of the four print photos (2513 glyphs) and tested on lines 17 to 24, which it never saw.
+   Exact variant of 27 goes from 21% to **60%**; axis levels from 65% / 51% / 47% to 84% / 86% / 73%. With one
+   photo each and about 600 training glyphs, the monitor photo goes from 8% to 29% and the scan from 16% to 25%.
+
+So a 300 dpi laser print of 11 pt text at strength 0.6 does carry most of the signal; the network has simply
+never seen real print. 2500 real glyphs are far too few (675 classes), and they already triple the accuracy. The
+paper trained on half real photos for this reason (section 4.3). Next step: real training data from printed
+sheets (`poc/07_training_sheets.py`, `poc/08_ingest_photos.py`).
 
 Consequence: the simulation in `camera.py` was too kind because it starts from an ideal anti-aliased page. Results
 in the tables above hold for a perfect printer or for text shown on a screen (untested), not for paper.
@@ -172,10 +203,18 @@ Ordered by how much each could change the answer.
 - [ ] **Make the variants survive a printer.** In this order:
       1. [x] Printer raster in the simulation (`pipeline.photograph(printer_dpi=...)`); 300 dpi reproduces the
          real numbers. Not yet used for training data or in `05_end_to_end.py`.
-      2. Calibration sheet: one PDF with the same text at several strengths (0.6, 1.0, 1.5, 2.0) and sizes (11,
-         14, 18 pt) for the owner to print and photograph once. It tells which step size a real printer keeps.
-      3. With that, choose strength and minimum font size, retrain on the printer-aware simulation, rebuild the
-         codebook (expect fewer variants per letter and lower capacity), repeat the real test.
+      2. [ ] **Real training data.** Sheets are built and waiting for the owner to print and photograph:
+         `poc/print/sheets-11pt-strength0.6.pdf` (3 pages, build directory `build`) and
+         `poc/print/sheets-14pt-strength1.0.pdf` (4 pages, build directory `build-s1.0-14pt`). Print at 100%,
+         photograph every page two or three times (whole page in frame, different distance and light). Then
+         `08_ingest_photos.py` makes labelled crops.
+      3. [ ] Train on simulated plus real crops (`03_train.py` cannot mix yet), hold out one printed page per
+         configuration (11 pt: the already printed `encoded-long.pdf`; 14 pt: sheet 4), rebuild the codebook from
+         real confusion, decode a real photo end to end. Decide strength and minimum size from that.
+      4. [ ] Make the simulation match print (compare real and simulated crops of the same glyph); until then no
+         simulated number counts for paper.
+      A model-free calibration sheet (nearest twin, per-axis discriminant on the photo itself) was tried and
+      dropped: it could not even separate variants on an ideal simulated page, so it measured the instrument.
       Also worth trying: axes that change shape more than stroke weight (`YTLC`, `slnt`, terminals), and adding
       the real crops (labels are known from `encoded-long.pdf`) to training.
 - [x] Screen instead of paper: tested, 14%, worse than paper at the zoom used. Add a screen model to the

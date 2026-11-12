@@ -26,15 +26,25 @@ Run from `poc/`. Everything is written to `build/` (gitignored).
 | 4 | `.venv/bin/python 04_build_codebook.py` | 10 s | `codebook.json`: per letter the variants that can be told apart |
 | 5 | `.venv/bin/python 05_end_to_end.py` | 2 min | `cover.pdf`, `encoded.pdf`, sample photos, `e2e-results.md` |
 
+| 6 | `.venv/bin/python 06_decode_photo.py <image>...` | seconds | decodes a real photo or scan, compares with the printed PDF (`HIPS_TRUTH`, default `build/encoded.pdf`) |
+| 7 | `.venv/bin/python 07_training_sheets.py 3 1` | seconds | `sheets/sheets.pdf`: A4 pages of random text with random variants, to print at 100% and photograph |
+| 8 | `.venv/bin/python 08_ingest_photos.py real <image>...` | seconds | `dataset-real.npz`: labelled crops from photos of the printed sheets |
+
 The argument of step 1 is the perturbation strength (ADR 0001). Changing it means repeating steps 2 to 5.
+
+One experiment, one build directory. Three environment variables set the conditions for all steps:
+`HIPS_BUILD` (directory under `poc/`, default `build`), `HIPS_SIZE` (text size in points, default 11) and
+`HIPS_PRINTER_DPI` (one-bit printer raster in the simulated photos, default none). `./sweep_print.sh 300 "1.5 14"
+"0.6 11"` runs steps 1 to 4 with a reduced budget for each "strength size" pair into
+`build-s<strength>-<size>pt-<dpi>dpi/`. `print/` holds copies of the PDFs waiting to be printed.
 
 Checks and diagnostics:
 
 - `.venv/bin/python test_coding.py`: block coding, frame, correction of one and two wrong letters per block.
 - `.venv/bin/python tools_segmentation_report.py 40 [english]`: how many lines the segmentation miscounts;
   failing lines are written to `build/badN.png`.
-- `.venv/bin/python 06_decode_photo.py <image>...`: decode a real photo or scan and compare it with the printed
-  document (`build/encoded.pdf`, or the PDF named by `HIPS_TRUTH`).
+- `HIPS_TRUTH=build/encoded-long.pdf .venv/bin/python tools_real_finetune.py <image>...`: trains further on the
+  upper lines of real photos and tests on the lower ones: does the print keep the information?
 - `HIPS_TRUTH=build/encoded-long.pdf .venv/bin/python tools_axis_confusion.py <image>...`: per variant axis, true
   level against recognised level on a real image; writes real and simulated crops side by side.
 

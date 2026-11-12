@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -13,6 +14,10 @@ from . import camera, coding, fonts, model, pdf, segment
 from .text import CARRIERS, CHARSET, class_of
 
 Codebook = dict[str, list[int]]  # letter -> variant ids; position in the list is the embedded integer
+
+# Conditions of an experiment, shared by the dataset and the end-to-end scripts.
+TEXT_SIZE = float(os.environ.get("HIPS_SIZE", "11"))  # points
+PRINTER_DPI = int(os.environ.get("HIPS_PRINTER_DPI", "0")) or None  # None: ideal page, no printer raster
 
 CODEBOOK_PATH = fonts.BUILD_DIR / "codebook.json"
 MODEL_PATH = fonts.BUILD_DIR / "glyphnet.pt"
