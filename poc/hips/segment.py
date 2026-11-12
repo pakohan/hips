@@ -52,6 +52,27 @@ def _darkness(gray: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return darkness, (darkness > SEPARATION_THRESHOLD).astype(np.uint8)
 
 
+def _paper_mask(gray: np.ndarray) -> np.ndarray:
+    """1 where the sheet of paper is, shrunk a little so its edge and shadow stay outside.
+
+    The paper is taken to be the largest region brighter than 60% of the brightest areas.
+    """
+    height, width = gray.shape
+    scale = 400.0 / width
+    small = cv2.resize(gray, (400, max(1, round(height * scale))), interpolation=cv2.INTER_AREA)
+    small = cv2.GaussianBlur(small, (0, 0), 4)  # text lines dissolve into light grey
+    bright = (small > 0.6 * np.percentile(small, 95)).astype(np.uint8)
+    count, labels, stats, _ = cv2.connectedComponentsWithStats(bright, connectivity=8)
+    if count < 2:
+        return np.ones_like(gray, dtype=np.uint8)
+    largest = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
+    contours, _ = cv2.findContours((labels == largest).astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    mask = np.zeros_like(bright)
+    cv2.drawContours(mask, contours, -1, 1, cv2.FILLED)
+    mask = cv2.erode(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21)), borderValue=0)
+    return cv2.resize(mask, (width, height), interpolation=cv2.INTER_NEAREST)
+
+
 def _x_height(heights: np.ndarray) -> float:
     """Most common component height among the letter-sized components."""
     tall = heights[heights >= 0.35 * np.percentile(heights, 90)]
@@ -62,12 +83,15 @@ def _x_height(heights: np.ndarray) -> float:
 
 def segment(gray: np.ndarray) -> Page:
     darkness, binary = _darkness(gray)
+    binary = binary * _paper_mask(gray)
     count, _, stats, _ = cv2.connectedComponentsWithStats(binary, connectivity=8)
     boxes = stats[1:count]
     if len(boxes) < 5:
         return Page(darkness, 0.0, [])
     x_height = _x_height(boxes[:, cv2.CC_STAT_HEIGHT])
     boxes = boxes[boxes[:, cv2.CC_STAT_AREA] >= max(2.0, (0.07 * x_height) ** 2)]
+    # A real photo shows the table around the page and the shadow at its edge: not letters.
+    boxes = boxes[(boxes[:, cv2.CC_STAT_HEIGHT] <= 3.0 * x_height) & (boxes[:, cv2.CC_STAT_WIDTH] <= 4.0 * x_height)]
     symbols = [Symbol(int(b[0]), int(b[1]), int(b[0] + b[2]), int(b[1] + b[3])) for b in boxes]
     symbols.sort(key=lambda s: s.x0)
 

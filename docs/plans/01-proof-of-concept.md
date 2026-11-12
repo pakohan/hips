@@ -3,8 +3,11 @@
 Question: can a message be hidden in the glyphs of a PDF and read back from a photo, offline, with a model small
 enough for a phone, when the paper comes without code, font model or codebook?
 
-**Answer so far (2026-11-12): yes in simulation.** The full chain works on simulated photos. It has not seen a
-real photo, a real print-out or a phone yet. Those are the remaining risks, listed under Open.
+**Answer so far (2026-11-12): yes in simulation, no on the first real print.** The full chain works on simulated
+photos. On the owner's photos and scan of a printed page, finding and naming the letters works, but the variant is
+recognised for only 26% to 49% of the letters (about 95% is needed, chance is 7%), so no message is recovered.
+The variants at strength 0.6 and 11 pt differ by about half a printer dot; see "Real photos" below. The method is
+not refuted, but the current variants are too fine for print.
 
 Code: `poc/` (how to run: `poc/README.md`). Decisions: ADR 0001 to 0005.
 
@@ -81,6 +84,45 @@ Long message (200 bytes, 159 of 175 blocks, so nearly every letter on the page m
 Raw tables with block error counts: `poc/build/e2e-results.md` after running step 5. "Variant accuracy" is over
 photos in which every character was segmented and named correctly.
 
+## Real photos (2026-11-12)
+
+The owner printed `encoded.pdf` (the 200-byte message; kept as `poc/build/encoded-long.pdf`) and supplied five
+images in `~/Desktop/pic`: one Google Drive document scan (2275x3206) and four Pixel camera photos (3000x4000),
+page slightly curled, dark table around it. Printer model and resolution are not known yet. Decoded with
+`poc/06_decode_photo.py`; x-height 41 to 49 px.
+
+| Image | Lines with the right symbol count | Characters misread | Variant right (codebook) | Message |
+|---|---|---|---|---|
+| Drive scan | 23/24 | 10 | 221/834 = 26% | none |
+| photo 143250 | 21/24 | 15 | 271/751 = 36% | none |
+| photo 144616 | 23/24 | 14 | 323/835 = 39% | none |
+| photo 146567 | 24/24 | 5 | 431/878 = 49% | none |
+| photo 147954 | 24/24 | 14 | 328/868 = 38% | none |
+
+A simulated photo at the same size gives 99% to 100%.
+
+What the diagnosis showed (`poc/tools_axis_confusion.py`):
+
+- **Segmentation and character naming carry over to real images** once everything outside the sheet is masked
+  out (`_paper_mask`; before that the table and the page edge produced hundreds of junk symbols). The one
+  repeated miss is "rt" in "forty" printing as one blob.
+- **Each axis is still read better than chance but far from well**: the level (-1, 0, +1) is right for 68% to 78%
+  of letters on the stroke axes and 45% to 49% on the counter axis. Errors are biased: strokes read thinner and
+  counters wider than they are. Real crops look thinner and rougher than simulated ones
+  (`poc/build/crops-<image>.png`).
+- **It is not a uniform weight shift.** Thickening or blurring the real image before decoding (gamma 0.35 to 1,
+  blur 0 to 1.5 px) never got above 49%.
+- **Printer resolution explains a large part.** At 11 pt a stem is 0.52 pt wide, 4.3 dots at 600 dpi, and the
+  strength-0.6 step changes it by 0.06 pt, half a dot. Putting a one-bit printer raster into the simulation drops
+  variant accuracy from 100% to 94% to 99% at 1200 dpi, 73% to 87% at 600 dpi and 47% to 50% at 300 dpi, with
+  the network unchanged. The real images are worse than the 600 dpi simulation, so more is missing (dot gain,
+  the printer's own stem snapping, phone sharpening, the scanner app's contrast processing).
+- The Drive scan is the worst input, not the best: its image processing removes more of the signal than a plain
+  photo does.
+
+Consequence: the simulation in `camera.py` was too kind because it starts from an ideal anti-aliased page. Results
+in the tables above hold for a perfect printer or for text shown on a screen (untested), not for paper.
+
 ## Learned
 
 - **Soft decoding beats the paper's decoder clearly** (long message at 24 px, severity 1.0: 19/20 against 12/20).
@@ -110,10 +152,19 @@ photos in which every character was segmented and named correctly.
 
 Ordered by how much each could change the answer.
 
-- [ ] **Real photos.** Print `poc/build/encoded.pdf` (and view it on a screen), photograph it with a phone at a
-      few distances, run the decoder on the files. The simulation has no paper texture, printer dot gain pattern,
-      screen moire, glare, lens distortion or curved pages. Needs the owner; no app required
-      (a small `06_decode_photo.py` taking an image path is the missing piece).
+- [x] Real photos of a print-out decoded with `06_decode_photo.py`: fails, see "Real photos".
+- [ ] **Make the variants survive a printer.** In this order:
+      1. Put the printer into `camera.py` (one-bit raster at 300/600/1200 dpi, dot gain, ragged edges) and tune it
+         until the simulation reproduces the 26% to 49% measured on the real images with the current network.
+      2. Calibration sheet: one PDF with the same text at several strengths (0.6, 1.0, 1.5, 2.0) and sizes (11,
+         14, 18 pt) for the owner to print and photograph once. It tells which step size a real printer keeps.
+      3. With that, choose strength and minimum font size, retrain on the printer-aware simulation, rebuild the
+         codebook (expect fewer variants per letter and lower capacity), repeat the real test.
+      Also worth trying: axes that change shape more than stroke weight (`YTLC`, `slnt`, terminals), and adding
+      the real crops (labels are known from `encoded-long.pdf`) to training.
+- [ ] **Screen instead of paper.** Photograph `encoded.pdf` on a monitor: no printer raster, but moire.
+      Untested; may be the easier first target.
+- [ ] Ask the owner for printer type and resolution (laser or inkjet, dpi).
 - [ ] **Resynchronisation.** Make an error local instead of fatal: restart the block structure at every line (line
       breaks survive printing and are visible to the reader) and add an outer code or repetition across lines.
       Without it, a long message needs every one of roughly 900 symbols segmented correctly.

@@ -33,6 +33,10 @@ Checks and diagnostics:
 - `.venv/bin/python test_coding.py`: block coding, frame, correction of one and two wrong letters per block.
 - `.venv/bin/python tools_segmentation_report.py 40 [english]`: how many lines the segmentation miscounts;
   failing lines are written to `build/badN.png`.
+- `.venv/bin/python 06_decode_photo.py <image>...`: decode a real photo or scan and compare it with the printed
+  document (`build/encoded.pdf`, or the PDF named by `HIPS_TRUTH`).
+- `HIPS_TRUTH=build/encoded-long.pdf .venv/bin/python tools_axis_confusion.py <image>...`: per variant axis, true
+  level against recognised level on a real image; writes real and simulated crops side by side.
 
 ## Modules
 
