@@ -40,9 +40,25 @@ def embed_message(chars: list[str], message: bytes, codebook: Codebook, rng: np.
     return variants
 
 
-def photograph(doc: pymupdf.Document, size: float, x_height: float, rng: np.random.Generator, severity: float) -> np.ndarray:
-    """Renders page 0 at twice the wanted resolution and passes it through the simulated camera."""
-    return camera.simulate(pdf.rasterise(doc, 2 * x_height, size), rng, 0.5, severity)
+def photograph(
+    doc: pymupdf.Document,
+    size: float,
+    x_height: float,
+    rng: np.random.Generator,
+    severity: float,
+    printer_dpi: int | None = None,
+) -> np.ndarray:
+    """Simulated photo of page 0 in which the x-height is `x_height` pixels.
+
+    Without `printer_dpi` the camera sees an ideal anti-aliased page, which no printer produces.
+    With it, the page first becomes a one-bit raster at that resolution: at 300 dpi this alone
+    brings recognition down to what real laser prints gave (plan 01, "Real photos").
+    """
+    if printer_dpi is None:
+        return camera.simulate(pdf.rasterise(doc, 2 * x_height, size), rng, 0.5, severity)
+    printed_x_height = pdf.X_HEIGHT_EM * size * printer_dpi / 72
+    dots = np.where(pdf.rasterise(doc, printed_x_height, size) < 128, 0, 255).astype(np.uint8)
+    return camera.simulate(dots, rng, x_height / printed_x_height, severity)
 
 
 def crops_of(page: segment.Page) -> tuple[np.ndarray, np.ndarray]:

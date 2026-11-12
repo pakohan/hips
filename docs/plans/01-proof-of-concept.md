@@ -120,6 +120,22 @@ What the diagnosis showed (`poc/tools_axis_confusion.py`):
 - The Drive scan is the worst input, not the best: its image processing removes more of the signal than a plain
   photo does.
 
+**Update, same day.** The printer is a laser printer at 300 dpi, A4. The 300 dpi raster simulation (47% to 50%)
+therefore matches the real photos (36% to 49%) closely: printer resolution is the explanation, and
+`pipeline.photograph(..., printer_dpi=300)` is now the honest test condition. At 300 dpi and 11 pt a stem is 2.2
+dots wide and one strength-1.0 step is 0.4 dot; a full dot needs strength 2.5 at 11 pt or 1.5 at 18 pt.
+
+**Monitor photo** (`PXL_20261112_154825950.jpg`, same document on a 4K monitor, x-height 54 px in the photo):
+23/24 lines segmented, 25 characters misread, variant right 117/832 = **14%**, no message. Worse than paper. Axis
+levels right 41% to 46%, biased the other way: strokes read thicker than they are. The page was shown small: one
+screen pixel covers 4 to 5 camera pixels, so the x-height on screen was about 12 pixels and a stem about 2; the
+pixel grid is visible in the photo and dark-on-white text blooms.
+
+Taken together: every output device has a dot about as large as, or larger than, the differences we encode, and
+each shifts stroke weight globally in its own direction (laser thinner, screen thicker) by more than one step.
+Reading absolute stroke weight to a fraction of a dot cannot work. What can: differences of at least one device
+dot (larger steps or larger type), and decoding relative to the page's own average instead of absolute weight.
+
 Consequence: the simulation in `camera.py` was too kind because it starts from an ideal anti-aliased page. Results
 in the tables above hold for a perfect printer or for text shown on a screen (untested), not for paper.
 
@@ -154,17 +170,18 @@ Ordered by how much each could change the answer.
 
 - [x] Real photos of a print-out decoded with `06_decode_photo.py`: fails, see "Real photos".
 - [ ] **Make the variants survive a printer.** In this order:
-      1. Put the printer into `camera.py` (one-bit raster at 300/600/1200 dpi, dot gain, ragged edges) and tune it
-         until the simulation reproduces the 26% to 49% measured on the real images with the current network.
+      1. [x] Printer raster in the simulation (`pipeline.photograph(printer_dpi=...)`); 300 dpi reproduces the
+         real numbers. Not yet used for training data or in `05_end_to_end.py`.
       2. Calibration sheet: one PDF with the same text at several strengths (0.6, 1.0, 1.5, 2.0) and sizes (11,
          14, 18 pt) for the owner to print and photograph once. It tells which step size a real printer keeps.
       3. With that, choose strength and minimum font size, retrain on the printer-aware simulation, rebuild the
          codebook (expect fewer variants per letter and lower capacity), repeat the real test.
       Also worth trying: axes that change shape more than stroke weight (`YTLC`, `slnt`, terminals), and adding
       the real crops (labels are known from `encoded-long.pdf`) to training.
-- [ ] **Screen instead of paper.** Photograph `encoded.pdf` on a monitor: no printer raster, but moire.
-      Untested; may be the easier first target.
-- [ ] Ask the owner for printer type and resolution (laser or inkjet, dpi).
+- [x] Screen instead of paper: tested, 14%, worse than paper at the zoom used. Add a screen model to the
+      simulation (display pixel raster, blooming) before retrying; a larger zoom on screen is the cheap retest.
+- [ ] **Relative decoding.** Each medium shifts all strokes one way. Normalise per page (for example against the
+      non-carrier letters, which are always the base variant) so only differences between letters count.
 - [ ] **Resynchronisation.** Make an error local instead of fatal: restart the block structure at every line (line
       breaks survive printing and are visible to the reader) and add an outer code or repetition across lines.
       Without it, a long message needs every one of roughly 900 symbols segmented correctly.
