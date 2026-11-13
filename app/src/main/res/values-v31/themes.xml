@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Android 12 and later show a system splash screen: icon on the intro's colour, so one flows into the other. -->
+    <style name="Theme.HIPS" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/brand_navy</item>
+        <item name="android:windowSplashScreenBackground">@color/brand_navy</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+    </style>
+</resources>

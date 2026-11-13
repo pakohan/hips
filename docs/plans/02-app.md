@@ -86,6 +86,11 @@ itself once that page is printed.
       checkpoint (between segmentation, cropping and the network), which can take a few seconds.
 - [x] **App icon**: adaptive vector icon (`drawable/ic_launcher_*.xml`), four lines of text as bars with the
       thick "letters" in amber. The template's bitmap icons are gone; minSdk 29 always uses the adaptive one.
+- [x] **Intro that explains the name** (`ui/IntroScreen.kt`): H, I, P, S stacked in thick amber, then the rest
+      of "Hidden In Plain Sight" slides in thin and white; about 2.8 s, a tap skips it, once per launch. The
+      window background and, from Android 12, the system splash screen use the same navy with the icon, so the
+      start flows into the intro. No splash-screen library. Seen on the TV emulator; `IntroScreenTest` checks
+      that it ends on its own and on a tap.
 
 ## Open
 

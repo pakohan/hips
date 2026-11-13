@@ -1,6 +1,15 @@
 <resources>
     <string name="app_name">HIPS</string>
 
+    <!-- The name spelled out; the intro shows the first letter of each word first. Not to be translated. -->
+    <string-array name="intro_words" translatable="false">
+        <item>Hidden</item>
+        <item>In</item>
+        <item>Plain</item>
+        <item>Sight</item>
+    </string-array>
+    <string name="intro_description">HIPS: hidden in plain sight</string>
+
     <string name="tab_scan">Scan</string>
     <string name="tab_write">Write</string>
 

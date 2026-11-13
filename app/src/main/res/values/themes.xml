@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.HIPS" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.HIPS" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- What shows before the first frame: the colour the intro starts on. -->
+        <item name="android:windowBackground">@color/brand_navy</item>
+    </style>
 </resources>
