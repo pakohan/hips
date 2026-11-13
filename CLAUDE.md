@@ -7,10 +7,12 @@ text to reveal one. Everything runs on the device without a network.
 
 Start with `docs/README.md`: roadmap, the current plan with its Open list, and the ADRs.
 
-Package `com.pakohan.hips`, one `:app` Gradle module, Kotlin + Jetpack Compose. The Android side so far is the
-Studio template plus the print codec in `codec/` (pure Kotlin, ADR 0006); the plan is `docs/plans/02-app.md`.
+Package `com.pakohan.hips`, one `:app` Gradle module, Kotlin + Jetpack Compose: `codec/` (print codec, ADR
+0006), `scan/` (segmentation, LiteRT network, reader), `pdf/` (text to PDF), `ui/`, one `MainViewModel`. State
+and open work: `docs/plans/02-app.md`; what it is built from and the rules the code follows: ADR 0007.
 The proof of concept lives in `poc/` as Python and is not part of the Gradle build; it remains the reference
-implementation, the trainer of the network and the source of test vectors.
+implementation, the trainer of the network and the source of the test fixtures. `codec/` and the segmentation
+must stay compatible with it: change Python first, re-export the fixtures, then make the Kotlin tests pass.
 
 ## Build and verify
 
@@ -21,8 +23,10 @@ cd poc && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python 05_end_to_end.py          # needs the artefacts of steps 01 to 04 in poc/build/
 
 # Android. The shell's Java is 11; run Gradle through Android Studio (its Gradle tool) or with a JDK 17+.
-./gradlew :app:assembleDebug
-./gradlew :app:testDebugUnitTest           # codec tests against vectors from poc/tools_export_vectors.py
+./gradlew :app:assembleDebug :app:lintDebug
+./gradlew :app:testDebugUnitTest           # codec, segmentation, reader against fixtures exported from poc/
+./gradlew :app:connectedDebugAndroidTest   # LiteRT and PDF on a device; runs on every connected device.
+                                           # LiteRT tests skip on M4-hosted phone emulators (ADR 0007).
 ```
 
 `poc/build/` is generated and gitignored (fonts, datasets, model, PDFs). Regenerate it with steps 01 to 04; about
@@ -46,11 +50,12 @@ cd poc && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 - Report measured numbers, including the bad ones. The point of each phase is to find out what does not work.
 - Before calling a change done: the relevant checks pass, and you state what was verified and how.
 
-## Architecture rules (apply once Android code exists; see `docs/plans/00-roadmap.md`, phase 2)
+## Architecture rules
 
 - One Activity, one `:app` module, feature packages (`codec/`, `pdf/`, `scan/`, `ui/`). No use-case layer.
-- The codec (codebook, block coding, message frame) is pure Kotlin without Android imports, so it runs in JVM unit
-  tests against vectors exported from `poc/`.
+- The codec, the segmentation and the reader are pure Kotlin without Android imports, so they run in JVM unit
+  tests against fixtures exported from `poc/`. Android types stay in `GlyphClassifier`, `PhotoLoader`,
+  `PdfComposer`, the ViewModel and `ui/`.
 - Small immutable data models, value classes for ids and units, sealed interfaces for UI state.
 - ViewModels expose one `StateFlow<UiState>`; `viewModelScope` only.
 - Compose versions come only from the Compose BOM.

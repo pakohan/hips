@@ -9,6 +9,25 @@ class GrayImage(val width: Int, val height: Int, val pixels: ByteArray) {
     init {
         require(pixels.size == width * height) { "expected ${width * height} pixels, got ${pixels.size}" }
     }
+
+    /** The photo turned clockwise by [quarterTurns] times 90 degrees. */
+    fun rotated(quarterTurns: Int): GrayImage =
+        when (quarterTurns.mod(4)) {
+            0 -> this
+            2 -> GrayImage(width, height, pixels.reversedArray())
+            else -> {
+                val clockwise = quarterTurns.mod(4) == 1
+                val turned = ByteArray(pixels.size)
+                for (y in 0 until height) {
+                    for (x in 0 until width) {
+                        val column = if (clockwise) height - 1 - y else y
+                        val row = if (clockwise) x else width - 1 - x
+                        turned[row * height + column] = pixels[y * width + x]
+                    }
+                }
+                GrayImage(height, width, turned)
+            }
+        }
 }
 
 /** A character found in the photo. [right] and [bottom] are exclusive. */
@@ -77,9 +96,8 @@ object Segmenter {
     private const val MIN_SYMBOLS = 5
 
     fun segment(image: GrayImage): SegmentedPage {
-        val gray = Plane(image.width, image.height, FloatArray(image.pixels.size) { (image.pixels[it].toInt() and 0xFF).toFloat() })
-        val darkness = darkness(gray)
-        val mask = paperMask(gray)
+        val darkness = darkness(image)
+        val mask = paperMask(image)
         val boxes = components(darkness, mask)
         if (boxes.size < MIN_SYMBOLS) return SegmentedPage(darkness, 0f, emptyList())
 
@@ -93,17 +111,24 @@ object Segmenter {
     }
 
     /** Removes uneven light and scales solid ink to 1. */
-    private fun darkness(gray: Plane): Plane {
+    private fun darkness(gray: GrayImage): Plane {
         val small = ImageOps.resizeArea(gray, max(1, gray.width / 4), max(1, gray.height / 4)).rounded()
         val kernel = max(31, small.width / 20) or 1
         val closed = ImageOps.erode(ImageOps.dilate(small, kernel), kernel)
-        val background = ImageOps.resizeLinear(ImageOps.gaussianBlur(closed, kernel / 2.0).rounded(), gray.width, gray.height).rounded()
+        val background = ImageOps.gaussianBlur(closed, kernel / 2.0).rounded()
         val darkness = Plane(gray.width, gray.height)
         val histogram = IntArray(256)
-        for (i in darkness.data.indices) {
-            val value = 1f - (gray.data[i] / max(background.data[i], 1f)).coerceIn(0f, 1f)
-            darkness.data[i] = value
-            histogram[(value * 255f).toInt()] += 1
+        // The background is scaled back up one row at a time: a photo-sized copy would cost 48 MB.
+        val backgroundRow = FloatArray(gray.width)
+        for (y in 0 until gray.height) {
+            ImageOps.resizeLinearRow(background, gray.width, gray.height, y, backgroundRow)
+            val offset = y * gray.width
+            for (x in 0 until gray.width) {
+                val paper = max(Math.rint(backgroundRow[x].toDouble()).toFloat(), 1f)
+                val value = 1f - ((gray.pixels[offset + x].toInt() and 0xFF) / paper).coerceIn(0f, 1f)
+                darkness.data[offset + x] = value
+                histogram[(value * 255f).toInt()] += 1
+            }
         }
         val threshold = ImageOps.otsu(histogram)
         val ink = FloatArray((threshold + 1..255).sumOf { histogram[it] })
@@ -121,7 +146,7 @@ object Segmenter {
      * Where the sheet of paper is, shrunk a little so its edge and shadow stay outside: the largest
      * region brighter than 60% of the brightest areas. Kept at low resolution.
      */
-    private fun paperMask(gray: Plane): PaperMask {
+    private fun paperMask(gray: GrayImage): PaperMask {
         val height = max(1, Math.rint(gray.height * MASK_WIDTH.toDouble() / gray.width).toInt())
         val small = ImageOps.gaussianBlur(ImageOps.resizeArea(gray, MASK_WIDTH, height).rounded(), 4.0).rounded()
         val limit = 0.6f * ImageOps.percentile(small.data.sortedArray(), 0.95)

@@ -2,52 +2,63 @@
 
 Goal of the first version (owner, 2026-11-13): get the app onto a phone soon "to see how it really behaves".
 Target is the configuration that works on paper: 14 pt text, strength 1.0, the print codec of ADR 0006. 14 pt is
-enough; 11 pt is not pursued.
+enough; 11 pt is not pursued. What it is built from and why: ADR 0007.
 
-What a first version must do: take or pick a photo of a printed HIPS page and show the message; turn a text and
-a message into a PDF that can be printed.
+**State (2026-11-13): a first version is built and installs. It has not run on a real phone yet.** Scan tab: take
+or pick a photo, see the message. Write tab: text and message in, PDF out.
 
 ## Done
 
-- [x] Print codec in pure Kotlin: `app/src/main/java/com/pakohan/hips/codec/` (`Bch`, `MessageFrame`,
-      `PrintCodec`), no Android imports. 13 JVM tests, among them vectors exported from the Python reference
-      (`poc/tools_export_vectors.py` writes `app/src/test/resources/codec/*.txt`): same BCH words, same packets,
-      same packet letters, and the Kotlin reader decodes the page the Python encoder wrote.
-- [x] Network exported to LiteRT: `poc/11_export_model.py` writes `poc/build-s1.0-14pt/glyphnet.tflite`, 3.8 MB,
-      largest difference to PyTorch 8e-6. Inputs `crops` float32 [64, 1, 64, 64] (0 = paper, 1 = ink) and
-      `features` float32 [64, 2]; output float32 [64, 722] probabilities. Batch fixed at 64.
+- [x] Print codec in pure Kotlin: `codec/` (`Bch`, `MessageFrame`, `PrintCodec`). JVM tests against vectors from
+      the Python reference (`poc/tools_export_vectors.py`): same BCH words, same packets, same packet letters,
+      and the Kotlin reader decodes the page the Python encoder wrote.
+- [x] Network exported to LiteRT: `poc/11_export_model.py` writes `glyphnet.tflite`, 3.8 MB, largest difference
+      to PyTorch 8e-6. Copied to `app/src/main/assets/` with the five fonts (`fonts/HIPSFlex00`, `12`, `15`, `21`,
+      `24`) from `poc/build-s1.0-14pt/`.
+- [x] Segmentation in Kotlin: `scan/Segmenter.kt`, `scan/ImageOps.kt`. On the fixture photo
+      (`poc/tools_export_segmentation.py`) it finds the same x-height, lines and symbols as Python, boxes within
+      one pixel, crops within one grey level on average (`SegmenterTest`).
+- [x] Reader: `scan/PageReader.kt` (characters, four variant scores, page balancing, `PrintCodec.read`). With
+      the network's reference answers it reads the fixture's message on the JVM (`PageReaderTest`).
+- [x] `scan/GlyphClassifier.kt` (LiteRT), `scan/PhotoLoader.kt` (platform decoder, EXIF, OpenCV's luma weights).
+- [x] PDF: `pdf/TextLayout.kt` (the PoC's greedy wrap), `pdf/PdfComposer.kt` (platform `PdfDocument`).
+- [x] UI: one Activity, `MainViewModel` with one `StateFlow<UiState>`, `ui/HipsApp.kt` with two tabs,
+      `ui/ScanScreen.kt`, `ui/WriteScreen.kt`. FileProvider for the camera photo.
+- [x] Template example tests removed. No lint tooling, Hilt or navigation library (owner's choice, ADR 0007).
 
-## Decisions waiting for the owner
+## Verified, and how
 
-Adding dependencies needs the owner's yes (CLAUDE.md). Recommendation first in each row.
+- `./gradlew :app:testDebugUnitTest`: 17 tests pass (codec, segmentation, reader).
+- `./gradlew :app:assembleDebug :app:lintDebug`: builds, lint reports no errors.
+- `./gradlew :app:connectedDebugAndroidTest` on two emulators:
+  - Android TV emulator (API 36, arm64): all 4 pass. LiteRT on the device answers like PyTorch (largest
+    difference below 1e-3 over 267 crops), and the fixture photo becomes its message through the platform image
+    decoder, the Kotlin segmentation and LiteRT.
+  - Phone emulator `Medium_Phone_API_36.1`: the two PDF tests pass; the two LiteRT tests are skipped because
+    LiteRT crashes there (SME2, ADR 0007).
+- The PDF the app wrote on the emulator (`PdfComposerOnDeviceTest`, pulled with `adb exec-out run-as`) checked
+  with `poc/tools_check_app_pdf.py`: one A4 page, five embedded fonts `HIPSFlex00/12/15/21/24`, all text at
+  14 pt, message decoded from the PDF itself and from a simulated photo of it, 10 of 10 packets.
+- The app starts on the phone emulator and both tabs show their content (UI hierarchy dump).
 
-| Need | Recommended | Alternative |
-|---|---|---|
-| Run the network | LiteRT runtime (`com.google.ai.edge.litert`). No way around it: the network costs about 48 million multiply-adds per glyph and a page has 1,500 glyphs. | none |
-| Get a photo | System camera and photo picker through the Activity Result API that `activity-compose` already brings. No new dependency, and the photos are exactly what the network was trained on. | CameraX with a live preview and guidance. Nicer, more code, four artefacts; worth it once decoding from a photo works. |
-| Write the PDF | Platform `PdfDocument` and `Canvas` with the five fonts as assets: the app sets a text in the HIPS font and writes a new PDF. No new dependency. | PdfBox-Android to open an existing PDF, read its text and positions, and rewrite it. Needed for "alter an existing PDF" in the literal sense; only PDFs already set in the HIPS font keep their layout (roadmap question 1). |
-| Find the letters in the photo | Port `poc/hips/segment.py` to Kotlin on pixel arrays. No dependency. Risk: the crops must match what the network saw in training (resize and blur details); checked with crops exported from Python. | OpenCV for Android (exact same calls as the PoC, about 10 MB per ABI), or ML Kit text recognition. |
-| Lint and static analysis | ktlint and detekt Gradle plugins as in the JustWatch project, `./gradlew check` as the gate. | none for now |
-| Dependency injection, navigation | Neither: two screens, hand-wired. | Hilt and Navigation 3 as in the JustWatch project. |
-
-## Order of work once decided
-
-1. Scaffolding: remove the template tests and greeting, package layout (`codec/`, `scan/`, `pdf/`, `ui/`),
-   lint tooling if approved, `.claude/rules/kotlin.md` and the Gradle gate hook from the JustWatch project.
-2. Scan, bottom up, each step testable on the JVM against data exported from the PoC:
-   segmentation (photo pixels to symbols and crops; compare with Python crops of the owner's real photos),
-   reader (LiteRT, page balancing, `PrintCodec.read`, four orientations), then the screen.
-3. Compose a PDF: lay out text with the base font metrics, `PrintCodec.embed`, draw with the variant fonts.
-   Check: the PoC decodes the PDF the app wrote, and the app decodes a photo of its print.
-4. Device test by the owner with the real phone and printer.
+Not verified: anything on a real phone. In particular the camera hand-off, the photo picker, saving the PDF
+through the system file dialog, memory and time for a 12 MP photo, and whether the app reads a page it wrote
+itself once that page is printed.
 
 ## Open
 
-- [ ] The network is tied to this printer family, this phone and 14 pt. A second printer or phone is untested.
-- [ ] Time per page on a phone is unknown: 1,500 glyphs times four orientations. Orientation should be settled
-      before the network runs (for example from the line structure), not by decoding four times.
-- [ ] Assets: `HIPSFlex00`, `12`, `15`, `21`, `24` from `poc/build-s1.0-14pt/fonts/` (9 kB each) and
-      `glyphnet.tflite`. They are generated and gitignored today; the app needs them committed under
-      `app/src/main/assets/`.
-- [ ] Soft-decision decoding, more than one packet per line, a code across packets (plan 01, item 3b) are not
-      needed for a first version and can come from real use.
+- [ ] **Device test by the owner.** Run the app from Android Studio on the phone. Write tab: paste a text of at
+      least a few full lines, type a message, create the PDF, print at 100%. Scan tab: photograph the print.
+      Also pick one of the earlier photos of `encoded-small-14pt.pdf`: the PoC reads `https://example.org/hips`
+      from those. Report the details line under the result (lines, packets, seconds).
+- [ ] Time and memory per photo on the phone. If slow: settle orientation before running the network (line
+      structure) and run the network in fewer, larger batches.
+- [ ] Rewrite existing PDFs with PdfBox-Android (owner: "both, text first"). Needs the dependency added and the
+      font question answered in practice: only PDFs set in the HIPS font keep their layout.
+- [ ] Tell the user how much message fits while typing, instead of refusing afterwards.
+- [ ] Multi-page texts are written, but the reader handles one page per photo and each page repeats the
+      message from wherever the packet counter stands; untested.
+- [ ] CameraX with a preview and guidance (fill the frame, hold flat) if photos from the system camera turn out
+      to be the weak point.
+- [ ] The robustness items of plan 01 (soft decisions, more packets per line, code across packets, other
+      printers and phones) once real use shows which of them matters.

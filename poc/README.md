@@ -33,7 +33,10 @@ Run from `poc/`. Everything is written to `build/` (gitignored).
 | 10 | `.venv/bin/python 10_small_codebook.py encode [message]`, later `... decode <image>...` | seconds | the print codec (ADR 0006): `encoded-small.pdf` to print, then the message from photos of it |
 | 11 | `HIPS_BUILD=build-s1.0-14pt .venv-export/bin/python 11_export_model.py` | seconds | `glyphnet.tflite` for the app, checked against PyTorch; needs its own venv, see the script |
 
-`tools_export_vectors.py` writes the codec test vectors the Kotlin tests read (`app/src/test/resources/codec/`).
+For the app (ADR 0007): `tools_export_vectors.py` writes the codec test vectors and
+`HIPS_BUILD=build-s1.0-14pt HIPS_SIZE=14 tools_export_segmentation.py` the segmentation fixture that the Kotlin
+tests read (`app/src/test/resources/`). `tools_check_app_pdf.py <pdf>` (same environment) decodes a PDF the app
+wrote, from the PDF itself and from a simulated photo.
 
 `09_train_real.py none` trains on every real page with nothing held out; that is the network to use for a new
 printed page.

@@ -24,22 +24,45 @@ internal object ImageOps {
     /** Shrinks by averaging the source area under each target pixel (OpenCV INTER_AREA). */
     fun resizeArea(source: Plane, width: Int, height: Int): Plane {
         if (width > source.width || height > source.height) return resizeLinear(source, width, height)
-        val horizontal = Plane(width, source.height)
-        val columns = AreaTaps(source.width, width)
-        for (y in 0 until source.height) {
+        return resizeArea(source.width, source.height, width, height) { y, row ->
+            source.data.copyInto(row, 0, y * source.width, (y + 1) * source.width)
+        }
+    }
+
+    /** The same for a photo, read row by row so that no float copy of the whole photo is needed. */
+    fun resizeArea(source: GrayImage, width: Int, height: Int): Plane =
+        resizeArea(source.width, source.height, width, height) { y, row ->
+            val offset = y * source.width
+            for (x in row.indices) row[x] = (source.pixels[offset + x].toInt() and 0xFF).toFloat()
+        }
+
+    private inline fun resizeArea(
+        sourceWidth: Int,
+        sourceHeight: Int,
+        width: Int,
+        height: Int,
+        readRow: (Int, FloatArray) -> Unit,
+    ): Plane {
+        val result = Plane(width, height)
+        val columns = AreaTaps(sourceWidth, width)
+        val rows = AreaTaps(sourceHeight, height)
+        val sourceRow = FloatArray(sourceWidth)
+        val shrunkRow = FloatArray(width)
+        var target = 0
+        for (y in 0 until sourceHeight) {
+            readRow(y, sourceRow)
             for (x in 0 until width) {
                 var sum = 0f
-                for (tap in 0 until columns.count[x]) sum += source[columns.start[x] + tap, y] * columns.weight(x, tap)
-                horizontal.data[y * width + x] = sum
+                for (tap in 0 until columns.count[x]) sum += sourceRow[columns.start[x] + tap] * columns.weight(x, tap)
+                shrunkRow[x] = sum
             }
-        }
-        val result = Plane(width, height)
-        val rows = AreaTaps(source.height, height)
-        for (y in 0 until height) {
-            for (tap in 0 until rows.count[y]) {
-                val weight = rows.weight(y, tap)
-                val from = (rows.start[y] + tap) * width
-                for (x in 0 until width) result.data[y * width + x] += horizontal.data[from + x] * weight
+            // A source row lies under one target row, or under two where their border crosses it.
+            while (target < height && rows.start[target] + rows.count[target] - 1 < y) target += 1
+            var under = target
+            while (under < height && rows.start[under] <= y) {
+                val weight = rows.weight(under, y - rows.start[under])
+                for (x in 0 until width) result.data[under * width + x] += shrunkRow[x] * weight
+                under += 1
             }
         }
         return result
@@ -73,24 +96,30 @@ internal object ImageOps {
     /** Bilinear interpolation between pixel centres (OpenCV INTER_LINEAR). */
     fun resizeLinear(source: Plane, width: Int, height: Int): Plane {
         val result = Plane(width, height)
-        val scaleX = source.width.toFloat() / width
-        val scaleY = source.height.toFloat() / height
+        val row = FloatArray(width)
         for (y in 0 until height) {
-            val sourceY = max((y + 0.5f) * scaleY - 0.5f, 0f)
-            val y0 = min(sourceY.toInt(), source.height - 1)
-            val y1 = min(y0 + 1, source.height - 1)
-            val fy = sourceY - y0
-            for (x in 0 until width) {
-                val sourceX = max((x + 0.5f) * scaleX - 0.5f, 0f)
-                val x0 = min(sourceX.toInt(), source.width - 1)
-                val x1 = min(x0 + 1, source.width - 1)
-                val fx = sourceX - x0
-                val top = source[x0, y0] * (1 - fx) + source[x1, y0] * fx
-                val bottom = source[x0, y1] * (1 - fx) + source[x1, y1] * fx
-                result.data[y * width + x] = top * (1 - fy) + bottom * fy
-            }
+            resizeLinearRow(source, width, height, y, row)
+            row.copyInto(result.data, y * width)
         }
         return result
+    }
+
+    /** Row [y] of [resizeLinear], written into [into]. */
+    fun resizeLinearRow(source: Plane, width: Int, height: Int, y: Int, into: FloatArray) {
+        val scaleX = source.width.toFloat() / width
+        val sourceY = max((y + 0.5f) * (source.height.toFloat() / height) - 0.5f, 0f)
+        val y0 = min(sourceY.toInt(), source.height - 1)
+        val y1 = min(y0 + 1, source.height - 1)
+        val fy = sourceY - y0
+        for (x in 0 until width) {
+            val sourceX = max((x + 0.5f) * scaleX - 0.5f, 0f)
+            val x0 = min(sourceX.toInt(), source.width - 1)
+            val x1 = min(x0 + 1, source.width - 1)
+            val fx = sourceX - x0
+            val top = source[x0, y0] * (1 - fx) + source[x1, y0] * fx
+            val bottom = source[x0, y1] * (1 - fx) + source[x1, y1] * fx
+            into[x] = top * (1 - fy) + bottom * fy
+        }
     }
 
     /** Bicubic interpolation with a = -0.75 and replicated borders (OpenCV INTER_CUBIC). */
