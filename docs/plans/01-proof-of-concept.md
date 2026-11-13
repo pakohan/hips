@@ -9,8 +9,10 @@ recognised for only 26% to 49% of the letters (about 95% is needed, chance is 7%
 The cause was that the network had only ever seen simulated pages. **2026-11-13, with real training photos:** 27
 variants per letter stay out of reach on a 300 dpi laser print (49% to 60% on unseen pages), but three or four
 far-apart variants per letter are read at 96% to 99%, even at 11 pt. That is about 1 bit per letter after
-coding instead of 2, with a different block code (ADR 0006, proposed). Not yet shown: that it holds for photos
-taken at another distance or on another day. See "Real photos" below.
+coding instead of 2, with a different block code (ADR 0006). **With that codec a 24-byte message was recovered
+from 6 of 7 hand-held photos of two freshly printed pages** (all three at 14 pt, three of four at 11 pt), printed
+at 600 dpi although the network had only seen 300 dpi prints. So the answer for paper is yes, at about 0.8 bits
+per letter, comfortably at 14 pt and marginally at 11 pt. See "First message decoded from paper" below.
 
 Code: `poc/` (how to run: `poc/README.md`). Decisions: ADR 0001 to 0005.
 
@@ -203,6 +205,40 @@ What this says:
 So the honest state for paper: a small codebook works on pages photographed like the training pages; robustness
 to distance, light and print run is unproven and needs training photos that vary in exactly those.
 
+### First message decoded from paper (2026-11-13)
+
+The print codec of ADR 0006 (`poc/hips/smallcode.py`): four variants per letter, one BCH(63,36) packet per 32
+carrier letters and line, message repeated down the page. The owner printed `encoded-small.pdf` for both
+configurations (24-byte message `https://example.org/hips`, 8 packets) **at 600 dpi** and took seven photos, one
+page each, six of them rotated by 90 degrees and one upside down with a keyboard in the frame. The networks had
+only seen 300 dpi prints, and never these pages. `10_small_codebook.py decode` tries the four orientations and
+keeps the one with the most decoded packets.
+
+| Page | Photo | Network | Packets decoded | Bits corrected | Bits right in fully read lines | Message |
+|---|---|---|---|---|---|---|
+| 14 pt, strength 1.0 | 111455351 | 14 pt | 25/30 | 16 | 98.8% | recovered |
+| 14 pt, strength 1.0 | 111501621 | 14 pt | 29/30 | 13 | 99.3% | recovered |
+| 14 pt, strength 1.0 | 111503455 | 14 pt | 27/30 | 34 | 98.2% | recovered |
+| 11 pt, strength 0.6 | 111445437 | 11 pt | 28/46 | 90 | 93.9% | recovered |
+| 11 pt, strength 0.6 | 111450423 | 11 pt | 32/46 | 101 | 93.3% | recovered |
+| 11 pt, strength 0.6 | 111505487 | 11 pt | 33/46 | 89 | 94.2% | recovered |
+| 11 pt, strength 0.6 | 111507856 (upside down, keyboard in frame) | 11 pt | 12/46 | 43 | 93.3% | not recovered (no packet 4) |
+
+The 11 pt network also recovers the message from all three 14 pt photos (23 to 30 of 30 or 31 packets).
+
+What this shows and what it does not:
+
+- **The chain works on real paper**: PDF rewrite, laser print, hand-held phone photo, segmentation, network,
+  packets, message. Six of seven photos, with a network trained on about 20,000 (11 pt) and 6,600 (14 pt) real
+  glyphs from an earlier day and a coarser print.
+- **14 pt at strength 1.0 has margin** (1% to 2% wrong bits against 8% correctable); **11 pt at strength 0.6
+  does not** (6% to 7% wrong bits: a third of the packets fail, and the message survives through repetition).
+- **Line-local packets do their job.** Only 1 to 13 of 24 lines at 11 pt and 19 to 20 of 30 at 14 pt are read
+  letter for letter (a merged or misnamed symbol somewhere), yet most packets decode, because a packet only
+  needs its own 32 letters intact.
+- Only one message, one text, one printer, one phone, a 24-byte message that fits the page several times. A
+  message that fills the page has no repetition to lean on.
+
 Consequence: the simulation in `camera.py` was too kind because it starts from an ideal anti-aliased page. Results
 in the tables above hold for a perfect printer or for text shown on a screen (untested), not for paper.
 
@@ -244,11 +280,12 @@ Ordered by how much each could change the answer.
       3. [ ] **More varied photos of the pages already printed** (no new printing): each page from two or three
          distances (whole page, half page), in daylight and lamp light, on another day. Then hold out a whole
          session, not a page, and repeat `09_train_real.py` and `tools_small_codebooks.py`.
-      3a. [ ] **Small codebook end to end** (ADR 0006). Built: `poc/hips/smallcode.py` (four variants, BCH(63,36)
-         packet per line), `poc/10_small_codebook.py`, `poc/test_smallcode.py`. In simulation a full 14 pt page
-         decodes 30 of 30 packets. Networks for the test are trained on all real pages (`09_train_real.py none`).
-         Waiting for the owner: print `poc/print/encoded-small-11pt.pdf` and `encoded-small-14pt.pdf` at 100%,
-         photograph, then `10_small_codebook.py decode <images>` in the matching build directory.
+      3a. [x] Small codebook end to end (ADR 0006): message recovered from 6 of 7 real photos, see "First message
+         decoded from paper".
+      3b. [ ] Make it robust, in this order: train on the 17 further photos of 2026-11-13 (ingested as
+         `dataset-real2.npz`) and hold out a session; soft-decision decoding (the network's confidence per bit is
+         thrown away now); more than one packet per line at 14 pt; a page-filling message, which needs a code
+         across packets instead of repetition; photos of a part of the page.
       4. [ ] Make the simulation match print (compare real and simulated crops of the same glyph); until then no
          simulated number counts for paper.
       A model-free calibration sheet (nearest twin, per-axis discriminant on the photo itself) was tried and

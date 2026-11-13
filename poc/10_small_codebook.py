@@ -29,7 +29,11 @@ def truth_lines() -> list[list[pdf.Glyph]]:
 
 
 def report(name: str, gray: np.ndarray) -> None:
-    reading, lines = pipeline.read_small(gray, net, variants)
+    # A phone held flat over the page records no reliable orientation: read all four and keep the
+    # one in which the most packets decode.
+    turns = (None, cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_90_COUNTERCLOCKWISE, cv2.ROTATE_180)
+    attempts = [pipeline.read_small(gray if turn is None else cv2.rotate(gray, turn), net, variants) for turn in turns]
+    reading, lines = max(attempts, key=lambda attempt: (attempt[0].decoded, attempt[0].slots))
     print(f"{name}: message {reading.message!r}")
     print(f"   {len(lines)} lines, {reading.decoded}/{reading.slots} packets decoded, "
           f"{reading.corrected_bits} bits corrected in them, sequence numbers {reading.sequences}")

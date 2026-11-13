@@ -1,6 +1,7 @@
 # ADR 0006: For print, few far-apart variants per letter instead of many close ones
 
-Status: Proposed (2026-11-13). Becomes Accepted when a real photo decodes end to end.
+Status: Accepted (2026-11-13). A message was recovered from 6 of 7 real photos of two printed pages
+(`docs/plans/01-proof-of-concept.md`, "First message decoded from paper").
 
 ## Context
 
@@ -21,7 +22,7 @@ Real 300 dpi laser prints do not support that. After training on real glyphs, on
 
 The counter-width axis (`XTRA`) is read at 56% to 64% and costs more than it carries.
 
-## Decision (proposed; the owner chose this direction on 2026-11-13)
+## Decision (the owner chose this direction on 2026-11-13)
 
 Implemented in `poc/hips/smallcode.py`, checked by `poc/test_smallcode.py`.
 
