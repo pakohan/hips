@@ -10,8 +10,8 @@ The cause was that the network had only ever seen simulated pages. **2026-11-13,
 variants per letter stay out of reach on a 300 dpi laser print (49% to 60% on unseen pages), but three or four
 far-apart variants per letter are read at 96% to 99%, even at 11 pt. That is about 1 bit per letter after
 coding instead of 2, with a different block code (ADR 0006). **With that codec a 24-byte message was recovered
-from 6 of 7 hand-held photos of two freshly printed pages** (all three at 14 pt, three of four at 11 pt), printed
-at 600 dpi although the network had only seen 300 dpi prints. So the answer for paper is yes, at about 0.8 bits
+from 6 of 7 hand-held photos of two freshly printed pages** (all three at 14 pt, three of four at 11 pt; all
+seven after training on more real photos), printed at 600 dpi although the network had only seen 300 dpi prints. So the answer for paper is yes, at about 0.8 bits
 per letter, comfortably at 14 pt and marginally at 11 pt. See "First message decoded from paper" below.
 
 Code: `poc/` (how to run: `poc/README.md`). Decisions: ADR 0001 to 0005.
@@ -226,6 +226,13 @@ keeps the one with the most decoded packets.
 
 The 11 pt network also recovers the message from all three 14 pt photos (23 to 30 of 30 or 31 packets).
 
+**After adding the 17 further photos of the same morning** (training sheets and `encoded-long.pdf` again, other
+distances; 11 pt: 39,000 real glyphs instead of 19,000, 14 pt: 19,500 instead of 6,600; `09_train_real.py none
+20`): **all seven photos decode.** 11 pt: 26, 34, 37 and, for the upside-down photo, 15 of 46 packets; bits right
+93.8% to 94.7%. 14 pt: unchanged, 97.3% to 98.6% of bits right. So more real data rescued the weakest photo but
+did not move the bit error rate at 11 pt much; that setting stays marginal and lives on repetition. The networks
+before this retraining are kept as `glyphnet-real-v1.pt`.
+
 What this shows and what it does not:
 
 - **The chain works on real paper**: PDF rewrite, laser print, hand-held phone photo, segmentation, network,
@@ -282,8 +289,9 @@ Ordered by how much each could change the answer.
          session, not a page, and repeat `09_train_real.py` and `tools_small_codebooks.py`.
       3a. [x] Small codebook end to end (ADR 0006): message recovered from 6 of 7 real photos, see "First message
          decoded from paper".
-      3b. [ ] Make it robust, in this order: train on the 17 further photos of 2026-11-13 (ingested as
-         `dataset-real2.npz`) and hold out a session; soft-decision decoding (the network's confidence per bit is
+      3b. [ ] Make it robust, in this order: hold out a whole photo session when training (the 17 further photos
+         of 2026-11-13 are ingested as `dataset-real2.npz` and already used for the current networks);
+         soft-decision decoding (the network's confidence per bit is
          thrown away now); more than one packet per line at 14 pt; a page-filling message, which needs a code
          across packets instead of repetition; photos of a part of the page.
       4. [ ] Make the simulation match print (compare real and simulated crops of the same glyph); until then no
