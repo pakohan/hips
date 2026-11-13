@@ -29,6 +29,11 @@ Run from `poc/`. Everything is written to `build/` (gitignored).
 | 6 | `.venv/bin/python 06_decode_photo.py <image>...` | seconds | decodes a real photo or scan, compares with the printed PDF (`HIPS_TRUTH`, default `build/encoded.pdf`) |
 | 7 | `.venv/bin/python 07_training_sheets.py 3 1` | seconds | `sheets/sheets.pdf`: A4 pages of random text with random variants, to print at 100% and photograph |
 | 8 | `.venv/bin/python 08_ingest_photos.py real <image>...` | seconds | `dataset-real.npz`: labelled crops from photos of the printed sheets |
+| 9 | `.venv/bin/python 09_train_real.py sheet-03.pdf` | 5 min | `glyphnet-real.pt`: the network trained further on the real crops, tested on the named held-out pages |
+
+After step 9, `tools_small_codebooks.py <held-out pages>` shows how codebooks of 2 to 9 far-apart variants are
+read on the held-out pages (ADR 0006), and `tools_axis_heads.py <held-out pages>` repeats step 9 with one output
+per axis.
 
 The argument of step 1 is the perturbation strength (ADR 0001). Changing it means repeating steps 2 to 5.
 

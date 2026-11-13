@@ -6,9 +6,11 @@ enough for a phone, when the paper comes without code, font model or codebook?
 **Answer so far (2026-11-12): yes in simulation, no on the first real print.** The full chain works on simulated
 photos. On the owner's photos and scan of a printed page, finding and naming the letters works, but the variant is
 recognised for only 26% to 49% of the letters (about 95% is needed, chance is 7%), so no message is recovered.
-The cause is that the network has only ever seen simulated pages: after brief further training on 2500 real
-glyphs it reads 60% of held-out real glyphs (of 27 variants), up from 21%. See "Real photos" below. The method
-is not refuted; it needs real training data, and probably somewhat stronger variants or larger type.
+The cause was that the network had only ever seen simulated pages. **2026-11-13, with real training photos:** 27
+variants per letter stay out of reach on a 300 dpi laser print (49% to 60% on unseen pages), but three or four
+far-apart variants per letter are read at 96% to 99%, even at 11 pt. That is about 1 bit per letter after
+coding instead of 2, with a different block code (ADR 0006, proposed). Not yet shown: that it holds for photos
+taken at another distance or on another day. See "Real photos" below.
 
 Code: `poc/` (how to run: `poc/README.md`). Decisions: ADR 0001 to 0005.
 
@@ -167,6 +169,40 @@ never seen real print. 2500 real glyphs are far too few (675 classes), and they 
 paper trained on half real photos for this reason (section 4.3). Next step: real training data from printed
 sheets (`poc/07_training_sheets.py`, `poc/08_ingest_photos.py`).
 
+### Real training data (2026-11-13)
+
+The owner printed the training sheets (300 dpi laser) and took ten photos, one whole page each, x-height 27 to
+31 px for the 11 pt pages and 38 to 39 px for the 14 pt pages. `08_ingest_photos.py` reads the characters with
+the network, aligns them with the text of each known page and so labels 75% to 95% of the glyphs of a photo even
+where lines are miscounted; one photo was rotated by 90 degrees, which it now tries.
+
+| Configuration | Real glyphs trained on | Held-out page | Variant of 27 before | after | Axis levels after (XOPQ / YOPQ / XTRA) |
+|---|---|---|---|---|---|
+| 11 pt, strength 0.6 | 12,942 (sheets 1, 2; 5 photos) | sheet 3 | 15% | 49% | 77% / 89% / 56% |
+| 11 pt, strength 0.6 | same | `encoded-long.pdf`, photos of the day before, x-height 45 to 49 px | 30% | 17% | 59% / 51% / 44% |
+| 14 pt, strength 1.0 | 4,921 (sheets 1 to 3; 3 photos) | sheet 4 | 28% | 60% | 81% / 91% / 64% |
+
+(`09_train_real.py`: 30 epochs on the real glyphs mixed with as many simulated ones, starting from the
+simulated-data network.)
+
+What this says:
+
+- **27 variants per letter are out of reach on this printer**, at either setting. One output per axis instead of
+  one class per variant (`tools_axis_heads.py`) reads the axes exactly as well (81% / 91% / 60%), so the limit is
+  the print, not the number of classes.
+- **A few far-apart variants are read almost perfectly**, even at the original 11 pt and strength 0.6
+  (`tools_small_codebooks.py`, held-out pages, network may only choose within the small codebook): thin / normal /
+  bold 99%, four thick-thin combinations of the two stroke axes 96% to 97%, nine 84% to 88%. Table in ADR 0006.
+  Samples are small (157 to 379 glyphs per row).
+- **It does not carry over to another photo session yet.** On the photos of the day before (closer, another
+  print run) the same network reads thin / normal / bold at 47% and thin / bold at 81%. Dividing each variant's
+  score by its page average (a message uses all variants equally often, so a page-wide preference comes from the
+  device) lifts that to 55% and 88%: it helps, it is not enough. All real training photos came from one session
+  at one distance.
+
+So the honest state for paper: a small codebook works on pages photographed like the training pages; robustness
+to distance, light and print run is unproven and needs training photos that vary in exactly those.
+
 Consequence: the simulation in `camera.py` was too kind because it starts from an ideal anti-aliased page. Results
 in the tables above hold for a perfect printer or for text shown on a screen (untested), not for paper.
 
@@ -203,14 +239,13 @@ Ordered by how much each could change the answer.
 - [ ] **Make the variants survive a printer.** In this order:
       1. [x] Printer raster in the simulation (`pipeline.photograph(printer_dpi=...)`); 300 dpi reproduces the
          real numbers. Not yet used for training data or in `05_end_to_end.py`.
-      2. [ ] **Real training data.** Sheets are built and waiting for the owner to print and photograph:
-         `poc/print/sheets-11pt-strength0.6.pdf` (3 pages, build directory `build`) and
-         `poc/print/sheets-14pt-strength1.0.pdf` (4 pages, build directory `build-s1.0-14pt`). Print at 100%,
-         photograph every page two or three times (whole page in frame, different distance and light). Then
-         `08_ingest_photos.py` makes labelled crops.
-      3. [ ] Train on simulated plus real crops (`03_train.py` cannot mix yet), hold out one printed page per
-         configuration (11 pt: the already printed `encoded-long.pdf`; 14 pt: sheet 4), rebuild the codebook from
-         real confusion, decode a real photo end to end. Decide strength and minimum size from that.
+      2. [x] Real training data from printed sheets (`poc/print/`, build directories `build` and
+         `build-s1.0-14pt`), ingested and trained on: see "Real training data".
+      3. [ ] **More varied photos of the pages already printed** (no new printing): each page from two or three
+         distances (whole page, half page), in daylight and lamp light, on another day. Then hold out a whole
+         session, not a page, and repeat `09_train_real.py` and `tools_small_codebooks.py`.
+      3a. [ ] **Small codebook end to end** (ADR 0006, proposed): 3 or 4 variants per letter from the stroke axes,
+         a conventional block code in place of the CRT code, encode a message, print, photograph, decode.
       4. [ ] Make the simulation match print (compare real and simulated crops of the same glyph); until then no
          simulated number counts for paper.
       A model-free calibration sheet (nearest twin, per-axis discriminant on the photo itself) was tried and

@@ -99,13 +99,13 @@ def read(probabilities: np.ndarray, codebook: Codebook, variants: int, soft: boo
     return Reading(chars, per_symbol, coding.unframe(bits), distances)
 
 
-def load_model(variants: int) -> model.GlyphNet:
+def load_model(variants: int, path: Path = MODEL_PATH) -> model.GlyphNet:
     import torch
 
     from .text import class_count
 
     net = model.GlyphNet(class_count(variants))
-    net.load_state_dict(torch.load(MODEL_PATH, map_location="cpu"))
+    net.load_state_dict(torch.load(path, map_location="cpu"))
     return net.to(model.device()).eval()
 
 
