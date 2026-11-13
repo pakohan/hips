@@ -25,8 +25,13 @@ cd poc && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 # Android. The shell's Java is 11; run Gradle through Android Studio (its Gradle tool) or with a JDK 17+.
 ./gradlew :app:assembleDebug :app:lintDebug
 ./gradlew :app:testDebugUnitTest           # codec, segmentation, reader against fixtures exported from poc/
-./gradlew :app:connectedDebugAndroidTest   # LiteRT and PDF on a device; runs on every connected device.
+./gradlew :app:connectedDebugAndroidTest   # LiteRT and PDF on a device; runs on every connected device
+                                           # (ANDROID_SERIAL=<serial> limits it to one).
                                            # LiteRT tests skip on M4-hosted phone emulators (ADR 0007).
+./gradlew :app:connectedReleaseAndroidTest -Phips.testBuildType=release   # the same against release
+./gradlew :app:assembleRelease             # the build to try on a phone: a debug build run from Android
+                                           # Studio executes interpreted and needs minutes per photo.
+                                           # Signed with the debug key; R8 is off (docs/plans/02-app.md).
 ```
 
 `poc/build/` is generated and gitignored (fonts, datasets, model, PDFs). Regenerate it with steps 01 to 04; about

@@ -19,11 +19,21 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // The device tests run against debug unless told otherwise: -Phips.testBuildType=release checks the
+    // build a person actually uses (see the release block).
+    testBuildType = providers.gradleProperty("hips.testBuildType").getOrElse("debug")
+
     buildTypes {
         release {
+            // A debug build started from Android Studio runs in ART's interpreter, where reading one photo
+            // takes minutes instead of seconds. Release is therefore the variant to try the app with, and
+            // until there is a release keystore it is signed with the debug key so it installs directly.
+            signingConfig = signingConfigs.getByName("debug")
             optimization {
-                enable = true
-                packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
+                // Off: with the template's partial optimisation (androidx, kotlin, kotlinx only) the app
+                // dies at start with "IllegalAccessError: Class kotlin.collections.j extended by class ih
+                // is inaccessible". Open item in docs/plans/02-app.md.
+                enable = false
             }
         }
     }

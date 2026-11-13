@@ -45,9 +45,30 @@ Not verified: anything on a real phone. In particular the camera hand-off, the p
 through the system file dialog, memory and time for a 12 MP photo, and whether the app reads a page it wrote
 itself once that page is printed.
 
+## Learned on the phone (Pixel 9a, 2026-11-13)
+
+- **A debug build started from Android Studio is far too slow to scan.** The owner saw the scan "stuck". The
+  scan thread was busy, not blocked: `simpleperf` showed 60% of its time in ART's on-stack-replacement lookups
+  and most of the rest in the switch interpreter (`ExecuteSwitchImplCpp`), so the pixel loops of the
+  segmentation ran interpreted. After 45 s of CPU time the scan had not finished. The release build is the one
+  to try the app with; it is signed with the debug key so it installs directly (`app/build.gradle.kts`).
+- **The template's partial R8 optimisation breaks the release build**: with `optimization { enable = true;
+  packageScope = androidx, kotlin, kotlinx }` the app dies at start with `IllegalAccessError: Class
+  kotlin.collections.j extended by class ih is inaccessible` (seen on the TV emulator; that build was also on
+  the phone for a few minutes). Optimisation is switched off for now.
+- Release build without optimisation: all four device tests pass on the TV emulator
+  (`./gradlew :app:connectedReleaseAndroidTest -Phips.testBuildType=release`), and the app starts on the phone.
+  How long a scan takes there is still unknown.
+
 ## Open
 
-- [ ] **Device test by the owner.** Run the app from Android Studio on the phone. Write tab: paste a text of at
+- [ ] Release build with R8: find out why the partial optimisation breaks class access (LiteRT pulls in
+      WorkManager and androidx.startup, whose initialiser is where it fails) or optimise the whole app with
+      keep rules. Until then the APK is unshrunk.
+
+- [ ] **Device test by the owner.** Use the **release** variant (Build Variants panel, or
+      `./gradlew :app:assembleRelease` and `adb install -r app/build/outputs/apk/release/app-release.apk`); a
+      debug run is too slow, see "Learned on the phone". Write tab: paste a text of at
       least a few full lines, type a message, create the PDF, print at 100%. Scan tab: photograph the print.
       Also pick one of the earlier photos of `encoded-small-14pt.pdf`: the PoC reads `https://example.org/hips`
       from those. Report the details line under the result (lines, packets, seconds).
