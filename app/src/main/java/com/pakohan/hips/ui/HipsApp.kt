@@ -26,7 +26,9 @@ private enum class AppTab(val title: Int) {
 @Composable
 fun HipsApp(
     state: UiState,
-    onScan: (Uri) -> Unit,
+    onScanPhoto: (Uri) -> Unit,
+    onScanPdf: (Uri) -> Unit,
+    onCancelScan: () -> Unit,
     canWrite: (text: String, message: String) -> Boolean,
     placeholderText: (message: String) -> String?,
     onWrite: (text: String, message: String, target: Uri) -> Unit,
@@ -45,7 +47,12 @@ fun HipsApp(
                 }
             }
             when (AppTab.entries[selected]) {
-                AppTab.SCAN -> ScanScreen(state = state.scan, onScan = onScan)
+                AppTab.SCAN -> ScanScreen(
+                    state = state.scan,
+                    onScanPhoto = onScanPhoto,
+                    onScanPdf = onScanPdf,
+                    onCancel = onCancelScan,
+                )
                 AppTab.WRITE -> WriteScreen(
                     state = state.write,
                     canWrite = canWrite,

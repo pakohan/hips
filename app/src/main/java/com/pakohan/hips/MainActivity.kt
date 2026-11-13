@@ -21,7 +21,9 @@ class MainActivity : ComponentActivity() {
                 val state by viewModel.uiState.collectAsState()
                 HipsApp(
                     state = state,
-                    onScan = viewModel::scan,
+                    onScanPhoto = viewModel::scanPhoto,
+                    onScanPdf = viewModel::scanPdf,
+                    onCancelScan = viewModel::cancelScan,
                     canWrite = viewModel::canWrite,
                     placeholderText = viewModel::placeholderText,
                     onWrite = viewModel::write,

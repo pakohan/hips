@@ -53,7 +53,11 @@ object GlyphClasses {
 class PageReading(val reading: Reading, val lines: Int, val symbols: Int, val xHeight: Float)
 
 /** Photo to message: segmentation, the network, then the print codec (ADR 0006). */
-class PageReader(private val scorer: GlyphScorer) {
+/**
+ * [checkpoint] is called between the stages of a reading, each of which takes up to a few seconds.
+ * It may throw to abandon the reading, which is how a scan is cancelled.
+ */
+class PageReader(private val scorer: GlyphScorer, private val checkpoint: () -> Unit = {}) {
     /**
      * Reads a photo whatever way up it is stored: a phone held flat over a page records no reliable
      * orientation. Text lying on its side breaks into many short "lines", so the segmentation alone
@@ -63,6 +67,7 @@ class PageReader(private val scorer: GlyphScorer) {
     fun read(image: GrayImage): PageReading {
         var quarterTurns = 0
         var page = Segmenter.segment(image)
+        checkpoint()
         Segmenter.segment(image.rotated(1)).let { sideways ->
             if (symbolsPerLine(sideways) > symbolsPerLine(page)) {
                 quarterTurns = 1
@@ -71,6 +76,7 @@ class PageReader(private val scorer: GlyphScorer) {
         }
         val first = read(page)
         if (first.reading.message != null) return first
+        checkpoint()
         val halfTurned = read(Segmenter.segment(image.rotated(quarterTurns + 2)))
         val better = halfTurned.reading.message != null || halfTurned.reading.packetsDecoded > first.reading.packetsDecoded
         return if (better) halfTurned else first
@@ -79,9 +85,16 @@ class PageReader(private val scorer: GlyphScorer) {
     private fun symbolsPerLine(page: SegmentedPage): Float =
         if (page.lines.isEmpty()) 0f else page.lines.sumOf { it.size }.toFloat() / page.lines.size
 
+    /** Reads an image known to be the right way up, such as a page drawn from a PDF. */
+    fun readUpright(image: GrayImage): PageReading = read(Segmenter.segment(image))
+
     private fun read(page: SegmentedPage): PageReading {
+        checkpoint()
         val symbols = page.lines.flatten()
-        val probabilities = scorer.score(symbols.map(page::crop))
+        val crops = symbols.map(page::crop)
+        checkpoint()
+        val probabilities = scorer.score(crops)
+        checkpoint()
 
         val characters = CharArray(symbols.size)
         val scores = arrayOfNulls<FloatArray>(symbols.size)

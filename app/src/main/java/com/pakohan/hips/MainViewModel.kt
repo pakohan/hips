@@ -11,9 +11,13 @@ import com.pakohan.hips.pdf.PdfComposer
 import com.pakohan.hips.scan.GlyphClassifier
 import com.pakohan.hips.scan.PageReader
 import com.pakohan.hips.scan.PageReading
+import com.pakohan.hips.scan.PdfPages
 import com.pakohan.hips.scan.PhotoLoader
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -64,24 +68,56 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val scanExecutor = Executors.newSingleThreadExecutor()
     private val scanDispatcher = scanExecutor.asCoroutineDispatcher()
     private var classifier: GlyphClassifier? = null
+    private var scanJob: Job? = null
 
-    fun scan(photo: Uri) {
+    fun scanPhoto(photo: Uri) = scan { reader -> reader.read(PhotoLoader.load(contentResolver, photo)) }
+
+    /** Reads the pages of a PDF one after the other and stops at the first that holds a message. */
+    fun scanPdf(pdf: Uri) =
+        scan { reader ->
+            PdfPages(contentResolver, pdf).use { pages ->
+                var best: PageReading? = null
+                for (index in 0 until pages.count) {
+                    val reading = reader.readUpright(pages.page(index))
+                    if (best == null || reading.reading.packetsDecoded > best.reading.packetsDecoded) best = reading
+                    if (reading.reading.message != null) break
+                }
+                best ?: throw IOException("the PDF has no pages")
+            }
+        }
+
+    /**
+     * Abandons the running scan. The screen is free at once; the scan thread stops at the reader's
+     * next checkpoint, which can take a few seconds, and a new scan waits for that.
+     */
+    fun cancelScan() {
+        scanJob?.cancel()
+        _uiState.update { it.copy(scan = ScanState.Idle) }
+    }
+
+    private fun scan(read: (PageReader) -> PageReading) {
+        scanJob?.cancel()
         _uiState.update { it.copy(scan = ScanState.Working) }
-        viewModelScope.launch(scanDispatcher) {
+        scanJob = viewModelScope.launch(scanDispatcher) {
             val state = try {
                 val started = SystemClock.elapsedRealtime()
-                val reader = PageReader(classifier ?: GlyphClassifier(getApplication()).also { classifier = it })
-                val reading = reader.read(PhotoLoader.load(getApplication<Application>().contentResolver, photo))
+                val scorer = classifier ?: GlyphClassifier(getApplication()).also { classifier = it }
+                val reading = read(PageReader(scorer, checkpoint = { ensureActive() }))
                 reading.toState((SystemClock.elapsedRealtime() - started) / 1000f)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: IOException) {
                 ScanState.Failed(e.message.orEmpty())
             } catch (e: RuntimeException) {
                 // LiteRT and the image decoder report their failures as unchecked exceptions.
                 ScanState.Failed(e.message ?: e.javaClass.simpleName)
             }
+            ensureActive() // a cancelled scan must not overwrite what the screen shows now
             _uiState.update { it.copy(scan = state) }
         }
     }
+
+    private val contentResolver get() = getApplication<Application>().contentResolver
 
     private fun PageReading.toState(seconds: Float) =
         ScanState.Done(

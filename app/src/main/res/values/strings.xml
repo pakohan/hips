@@ -4,10 +4,12 @@
     <string name="tab_scan">Scan</string>
     <string name="tab_write">Write</string>
 
-    <string name="scan_intro">Photograph one whole printed page, flat and sharp, or pick a photo you already took.</string>
+    <string name="scan_intro">Photograph one whole printed page, flat and sharp, pick a photo you already took, or open a PDF.</string>
     <string name="scan_take_photo">Take photo</string>
     <string name="scan_pick_photo">Pick photo</string>
+    <string name="scan_open_pdf">Open PDF</string>
     <string name="scan_working">Reading the page…</string>
+    <string name="scan_cancel">Cancel</string>
     <string name="scan_message_title">Hidden message</string>
     <string name="scan_no_message">No hidden message found.</string>
     <string name="scan_no_message_hint">Only pages written by this app, or with the same codec at 14 pt, carry a message it can read. The whole page must be in the photo, flat and sharp.</string>

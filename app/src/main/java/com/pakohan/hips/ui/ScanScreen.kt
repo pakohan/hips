@@ -7,7 +7,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -31,14 +31,23 @@ import com.pakohan.hips.ScanState
 import java.io.File
 
 @Composable
-fun ScanScreen(state: ScanState, onScan: (Uri) -> Unit, modifier: Modifier = Modifier) {
+fun ScanScreen(
+    state: ScanState,
+    onScanPhoto: (Uri) -> Unit,
+    onScanPdf: (Uri) -> Unit,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     val photoUri = remember { photoUri(context) }
     val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { taken ->
-        if (taken) onScan(photoUri)
+        if (taken) onScanPhoto(photoUri)
     }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { picked ->
-        if (picked != null) onScan(picked)
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { picked ->
+        if (picked != null) onScanPhoto(picked)
+    }
+    val pdfPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { picked ->
+        if (picked != null) onScanPdf(picked)
     }
     val working = state is ScanState.Working
 
@@ -47,15 +56,18 @@ fun ScanScreen(state: ScanState, onScan: (Uri) -> Unit, modifier: Modifier = Mod
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(stringResource(R.string.scan_intro))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(onClick = { camera.launch(photoUri) }, enabled = !working) {
                 Text(stringResource(R.string.scan_take_photo))
             }
             OutlinedButton(
-                onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                onClick = { photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                 enabled = !working,
             ) {
                 Text(stringResource(R.string.scan_pick_photo))
+            }
+            OutlinedButton(onClick = { pdfPicker.launch(arrayOf("application/pdf")) }, enabled = !working) {
+                Text(stringResource(R.string.scan_open_pdf))
             }
         }
         when (state) {
@@ -64,6 +76,7 @@ fun ScanScreen(state: ScanState, onScan: (Uri) -> Unit, modifier: Modifier = Mod
             ScanState.Working -> {
                 Text(stringResource(R.string.scan_working))
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                OutlinedButton(onClick = onCancel) { Text(stringResource(R.string.scan_cancel)) }
             }
 
             is ScanState.Failed -> Text(

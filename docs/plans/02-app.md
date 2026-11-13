@@ -76,6 +76,16 @@ itself once that page is printed.
 - [x] "Placeholder text" on the Write tab: lorem ipsum long enough to carry the message three times, or to the
       end of the first page once it fits (`PdfComposer.placeholderText`, `LoremIpsum`).
 - [x] A hint under "No hidden message found" saying which pages can be read.
+- [x] **Scan a PDF directly** ("Open PDF"): `scan/PdfPages.kt` draws each page with the platform `PdfRenderer`
+      at 5.3 px per point (14 pt type gets a 38 px x-height) and hands it to the same reader; pages are read in
+      order until one holds a message. The owner had found that a screenshot of a PDF reads fine. The PDF is
+      drawn, not parsed, so no PDF library is involved and any PDF whose page looks like a HIPS page works.
+      Device test `aPdfWrittenByTheAppBecomesItsMessage`: placeholder text, written by `PdfComposer`, drawn by
+      `PdfPages`, read by LiteRT, all packets decoded.
+- [x] **Cancel** while a scan runs. The screen is free at once; the scan thread stops at the reader's next
+      checkpoint (between segmentation, cropping and the network), which can take a few seconds.
+- [x] **App icon**: adaptive vector icon (`drawable/ic_launcher_*.xml`), four lines of text as bars with the
+      thick "letters" in amber. The template's bitmap icons are gone; minSdk 29 always uses the adaptive one.
 
 ## Open
 

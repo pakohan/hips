@@ -1,6 +1,7 @@
 package com.pakohan.hips.scan
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Test
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -15,10 +16,12 @@ class PageReaderTest {
 
     @Test
     fun `reads the message of the fixture page from the reference network's answers`() {
-        val reader = PageReader { crops ->
-            assertEquals(referenceProbabilities.size, crops.size)
-            referenceProbabilities
-        }
+        val reader = PageReader(
+            scorer = { crops ->
+                assertEquals(referenceProbabilities.size, crops.size)
+                referenceProbabilities
+            },
+        )
         val result = reader.read(ScanFixture.image())
         assertEquals("hi", result.reading.message?.decodeToString())
         assertEquals(result.reading.packetSlots, result.reading.packetsDecoded)
@@ -30,13 +33,26 @@ class PageReaderTest {
     fun `reads a photo that lies on its side or stands on its head`() {
         // The reference answers only fit the upright page; any other view gets answers that name nothing useful.
         val blank = FloatArray(GlyphClasses.COUNT).also { it[GlyphClasses.COUNT - 1] = 1f }
-        val reader = PageReader { crops ->
-            if (crops.size == referenceProbabilities.size) referenceProbabilities else List(crops.size) { blank }
-        }
+        val reader = PageReader(
+            scorer = { crops ->
+                if (crops.size == referenceProbabilities.size) referenceProbabilities else List(crops.size) { blank }
+            },
+        )
         for (quarterTurns in 1..3) {
             val result = reader.read(ScanFixture.image().rotated(quarterTurns))
             assertEquals("after $quarterTurns quarter turns", "hi", result.reading.message?.decodeToString())
         }
+    }
+
+    @Test
+    fun `a checkpoint that throws abandons the reading before the network runs`() {
+        class Cancelled : RuntimeException()
+        var checkpoints = 0
+        val reader = PageReader(
+            scorer = { throw AssertionError("the network must not run after cancellation") },
+            checkpoint = { if (++checkpoints == 2) throw Cancelled() },
+        )
+        assertThrows(Cancelled::class.java) { reader.read(ScanFixture.image()) }
     }
 
     @Test

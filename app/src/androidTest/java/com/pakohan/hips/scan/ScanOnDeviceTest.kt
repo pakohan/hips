@@ -1,10 +1,14 @@
 package com.pakohan.hips.scan
 
 import android.graphics.ImageDecoder
+import android.net.Uri
 import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.pakohan.hips.pdf.ComposeResult
+import com.pakohan.hips.pdf.PdfComposer
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeFalse
 import org.junit.Before
 import org.junit.Test
@@ -58,6 +62,26 @@ class ScanOnDeviceTest {
             }
         }
         assert(largest < 1e-3f) { "a probability differs from the reference by $largest" }
+    }
+
+    /** The app's own loop without paper: write a PDF, draw its page as the PDF scan does, read it. */
+    @Test
+    fun aPdfWrittenByTheAppBecomesItsMessage() {
+        val context = instrumentation.targetContext
+        val composer = PdfComposer(context.assets)
+        val message = "read back from a PDF".encodeToByteArray()
+        val file = File(context.cacheDir, "loop.pdf")
+        val written = file.outputStream().use { composer.compose(composer.placeholderText(message), message, it) }
+        assertTrue("$written", written is ComposeResult.Written)
+
+        val result = GlyphClassifier(context).use { classifier ->
+            PdfPages(context.contentResolver, Uri.fromFile(file)).use { pages ->
+                assertEquals(1, pages.count)
+                PageReader(classifier).readUpright(pages.page(0))
+            }
+        }
+        assertEquals("read back from a PDF", result.reading.message?.decodeToString())
+        assertEquals(result.reading.packetSlots, result.reading.packetsDecoded)
     }
 
     @Test
