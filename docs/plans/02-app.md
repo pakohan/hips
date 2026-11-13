@@ -92,6 +92,16 @@ itself once that page is printed.
       start flows into the intro. No splash-screen library. Seen on the TV emulator; `IntroScreenTest` checks
       that it ends on its own and on a tap.
 
+- [x] **Design in the icon's colours** (owner: "a beautiful design that uses the logo's colour scheme").
+      `ui/theme/`: navy ink on warm paper in the light theme, the icon's night with amber as the light in the
+      dark theme; dynamic (wallpaper) colour is off on purpose, it would replace exactly these colours. A navy
+      header with the mark, the name and its meaning, and an amber pill that switches between the two halves,
+      now called "Reveal" and "Hide". Reveal: one amber tile for the camera, two quiet tiles for photo and PDF,
+      the found message amber-on-navy, the scan's facts as small pills. Hide: two numbered steps and one amber
+      button. Shared pieces in `ui/Components.kt`; `ui/Previews.kt` holds previews of both halves in both
+      themes, which is how the design was looked at (Android Studio preview renderer), not on the phone.
+      Icons are three vector drawables; no icon library was added.
+
 ## Open
 
 - [ ] Release build with R8: find out why the partial optimisation breaks class access (LiteRT pulls in
