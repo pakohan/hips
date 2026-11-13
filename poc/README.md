@@ -30,6 +30,10 @@ Run from `poc/`. Everything is written to `build/` (gitignored).
 | 7 | `.venv/bin/python 07_training_sheets.py 3 1` | seconds | `sheets/sheets.pdf`: A4 pages of random text with random variants, to print at 100% and photograph |
 | 8 | `.venv/bin/python 08_ingest_photos.py real <image>...` | seconds | `dataset-real.npz`: labelled crops from photos of the printed sheets |
 | 9 | `.venv/bin/python 09_train_real.py sheet-03.pdf` | 5 min | `glyphnet-real.pt`: the network trained further on the real crops, tested on the named held-out pages |
+| 10 | `.venv/bin/python 10_small_codebook.py encode [message]`, later `... decode <image>...` | seconds | the print codec (ADR 0006): `encoded-small.pdf` to print, then the message from photos of it |
+
+`09_train_real.py none` trains on every real page with nothing held out; that is the network to use for a new
+printed page.
 
 After step 9, `tools_small_codebooks.py <held-out pages>` shows how codebooks of 2 to 9 far-apart variants are
 read on the held-out pages (ADR 0006), and `tools_axis_heads.py <held-out pages>` repeats step 9 with one output
@@ -46,6 +50,8 @@ One experiment, one build directory. Three environment variables set the conditi
 Checks and diagnostics:
 
 - `.venv/bin/python test_coding.py`: block coding, frame, correction of one and two wrong letters per block.
+- `.venv/bin/python test_smallcode.py`: the print codec: BCH correction of up to five bits, rejection beyond,
+  message through noise, a lost letter and a ruined line.
 - `.venv/bin/python tools_segmentation_report.py 40 [english]`: how many lines the segmentation miscounts;
   failing lines are written to `build/badN.png`.
 - `HIPS_TRUTH=build/encoded-long.pdf .venv/bin/python tools_real_finetune.py <image>...`: trains further on the
@@ -60,6 +66,7 @@ Checks and diagnostics:
 | `hips/fonts.py` | Candidate variants from the variable font, fitted to the base glyph box (ADR 0001, 0002) |
 | `hips/pdf.py` | Lay out a cover PDF, rewrite the text of an existing PDF with variant fonts, read it back, rasterise |
 | `hips/coding.py` | Chinese Remainder block code, message frame, hard and soft decoding (ADR 0004) |
+| `hips/smallcode.py` | Print codec: four variants per letter, BCH(63,36) packet per line (ADR 0006) |
 | `hips/camera.py` | Simulated phone photo: ink gain, viewpoint, blur, uneven light, noise, JPEG |
 | `hips/segment.py` | Photo to symbols in reading order, normalised crops (ADR 0003) |
 | `hips/model.py` | The CNN, training loop, prediction |

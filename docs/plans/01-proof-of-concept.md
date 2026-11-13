@@ -244,8 +244,11 @@ Ordered by how much each could change the answer.
       3. [ ] **More varied photos of the pages already printed** (no new printing): each page from two or three
          distances (whole page, half page), in daylight and lamp light, on another day. Then hold out a whole
          session, not a page, and repeat `09_train_real.py` and `tools_small_codebooks.py`.
-      3a. [ ] **Small codebook end to end** (ADR 0006, proposed): 3 or 4 variants per letter from the stroke axes,
-         a conventional block code in place of the CRT code, encode a message, print, photograph, decode.
+      3a. [ ] **Small codebook end to end** (ADR 0006). Built: `poc/hips/smallcode.py` (four variants, BCH(63,36)
+         packet per line), `poc/10_small_codebook.py`, `poc/test_smallcode.py`. In simulation a full 14 pt page
+         decodes 30 of 30 packets. Networks for the test are trained on all real pages (`09_train_real.py none`).
+         Waiting for the owner: print `poc/print/encoded-small-11pt.pdf` and `encoded-small-14pt.pdf` at 100%,
+         photograph, then `10_small_codebook.py decode <images>` in the matching build directory.
       4. [ ] Make the simulation match print (compare real and simulated crops of the same glyph); until then no
          simulated number counts for paper.
       A model-free calibration sheet (nearest twin, per-axis discriminant on the photo itself) was tried and

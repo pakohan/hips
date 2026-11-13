@@ -21,22 +21,39 @@ Real 300 dpi laser prints do not support that. After training on real glyphs, on
 
 The counter-width axis (`XTRA`) is read at 56% to 64% and costs more than it carries.
 
-## Decision (proposed)
+## Decision (proposed; the owner chose this direction on 2026-11-13)
 
-- The codebook for printed documents has **3 or 4 variants per carrier letter**, the same for every letter, built
-  from the two stroke axes only. `XTRA` is not used.
-- With equal, small capacities the Chinese Remainder construction does not apply (five pairwise coprime moduli
-  need capacities up to 11). The block code becomes a conventional one over a fixed alphabet (binary or
-  quaternary BCH or Reed-Solomon over grouped letters); which one is open.
-- The network keeps predicting the letter and the variant; with so few variants a per-axis output is an option.
-  It made no difference on real data (`poc/tools_axis_heads.py`).
-- The many-variant codebook and the CRT code stay as the mode for documents that are only ever read digitally or
-  from a high-resolution source, if that mode is wanted at all.
+Implemented in `poc/hips/smallcode.py`, checked by `poc/test_smallcode.py`.
+
+- **Four variants per carrier letter**, the same for every letter: thin or thick vertical strokes (`XOPQ`) times
+  thin or thick horizontal strokes (`YOPQ`), counter width unchanged. Candidates 12, 15, 21, 24 of ADR 0001. A
+  letter carries two bits, one per axis, so one misread axis costs one bit.
+- **Carrier letters** are the lowercase letters except "l" (ADR 0004) and **"i"**: it has no horizontal stroke and
+  its `YOPQ` bit is read at chance (54% to 61% on real prints).
+- **One packet per 32 carrier letters, never across a line break.** A packet is 64 bits: a BCH(63,36) codeword
+  (GF(64), primitive polynomial x^6 + x + 1, corrects 5 wrong bits) plus one overall parity bit. Its 36 data bits:
+  5-bit sequence number, 27 payload bits, 4-bit CRC (x^4 + x + 1) over the other 32. The CRC is there because BCH
+  turns about 6% of random bit patterns into a valid codeword. Leftover letters of a line get random variants.
+- **Nothing in a packet depends on another line.** With the Chinese Remainder blocks one merged or split symbol
+  shifted everything after it; here it costs the packets of its own line. Line breaks are the synchronisation
+  marks: they survive printing and the reader finds them reliably.
+- **The message** is the frame of ADR 0004 (length, payload, CRC-16), cut into 27-bit payloads and repeated down
+  the page for as many packets as the text has room for. At most 32 packets, so 105 bytes. The reader takes, per
+  sequence number, the payload seen most often, and accepts the result when the CRC-16 matches.
+- **Reading** restricts the network's output to the four variants and divides each variant's score by its average
+  over the page: a message uses the four equally often, so a page-wide preference comes from the printer or the
+  camera. The network still has one class per (letter, candidate); a per-axis output made no difference on real
+  data (`poc/tools_axis_heads.py`).
+- The many-variant codebook and the CRT code (ADR 0004) stay in the PoC as the mode for documents that are only
+  read digitally; whether the app offers it is open.
 
 ## Consequences
 
-- Raw capacity drops from about 4 bits per letter to 1.6 or 2; after coding roughly 1 bit per letter, so about
-  100 bytes in a 20-line paragraph instead of 220.
+- Raw capacity drops from about 4 bits per letter to 2; a packet carries 27 payload bits in 32 letters, 0.84
+  bits per letter before repetition. A full A4 page of 14 pt text (30 lines) has room for 30 packets: about 100
+  bytes once, or a 24-byte message nearly four times. One packet per line wastes the rest of long lines (at 14 pt
+  about 20 of 52 carrier letters); packing is open.
+- Hard-decision BCH ignores how sure the network is of each bit. Soft decoding is open.
 - Fewer, larger differences per letter are also what keeps the text looking even: three weights instead of 27
   shapes. Whether three weights are less visible than 27 small variations has not been judged.
 - The frame (length, CRC) of ADR 0004 is unaffected. The paper's key-as-permutation encryption shrinks to

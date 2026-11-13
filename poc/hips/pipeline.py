@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import pymupdf
 
-from . import camera, coding, fonts, model, pdf, segment
+from . import camera, coding, fonts, model, pdf, segment, smallcode
 from .text import CARRIERS, CHARSET, class_of
 
 Codebook = dict[str, list[int]]  # letter -> variant ids; position in the list is the embedded integer
@@ -97,6 +97,33 @@ def read(probabilities: np.ndarray, codebook: Codebook, variants: int, soft: boo
     blocks = coding.make_blocks(caps)
     bits, distances = coding.decode(blocks, {i: per_symbol[p] for i, p in enumerate(positions)}, soft)
     return Reading(chars, per_symbol, coding.unframe(bits), distances)
+
+
+def read_small(gray: np.ndarray, net: model.GlyphNet, variants: int) -> tuple[smallcode.Reading, list[list[tuple[str, np.ndarray | None]]]]:
+    """Decodes a photo with the print codec (ADR 0006). Also returns what was read, per line."""
+    page = segment.segment(gray)
+    crops, features = crops_of(page)
+    if len(crops) == 0:
+        return smallcode.read([]), []
+    probabilities = model.predict(net, crops, features)
+    carrier_part = probabilities[:, : len(CARRIERS) * variants].reshape(len(probabilities), len(CARRIERS), variants)
+    char_scores = np.concatenate([carrier_part.sum(axis=2), probabilities[:, len(CARRIERS) * variants :]], axis=1)
+    chars = [CHARSET[i] for i in char_scores.argmax(axis=1)]
+    four = np.array([
+        carrier_part[row, CARRIERS.index(char), list(smallcode.FOUR)] if char in smallcode.SMALL_CARRIERS else np.zeros(4)
+        for row, char in enumerate(chars)
+    ])
+    is_carrier = np.array([char in smallcode.SMALL_CARRIERS for char in chars])
+    if is_carrier.any():
+        four[is_carrier] /= np.maximum(four[is_carrier].sum(axis=1, keepdims=True), 1e-9)
+        # A message uses the four variants equally often. A variant favoured across the whole page is
+        # favoured by the printer or the camera, so the page average is divided out.
+        four[is_carrier] /= np.maximum(four[is_carrier].mean(axis=0, keepdims=True), 1e-9)
+    lines, row = [], 0
+    for line in page.lines:
+        lines.append([(chars[row + i], four[row + i] if is_carrier[row + i] else None) for i in range(len(line))])
+        row += len(line)
+    return smallcode.read(lines), lines
 
 
 def load_model(variants: int, path: Path = MODEL_PATH) -> model.GlyphNet:
