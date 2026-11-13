@@ -70,7 +70,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(scanDispatcher) {
             val state = try {
                 val started = SystemClock.elapsedRealtime()
-                val reading = readAnyOrientation(photo)
+                val reader = PageReader(classifier ?: GlyphClassifier(getApplication()).also { classifier = it })
+                val reading = reader.read(PhotoLoader.load(getApplication<Application>().contentResolver, photo))
                 reading.toState((SystemClock.elapsedRealtime() - started) / 1000f)
             } catch (e: IOException) {
                 ScanState.Failed(e.message.orEmpty())
@@ -80,22 +81,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             _uiState.update { it.copy(scan = state) }
         }
-    }
-
-    /**
-     * A phone held flat over a page records no reliable orientation: when the photo as stored holds
-     * no message, the three other orientations are tried, and the one with the most packets is kept.
-     */
-    private fun readAnyOrientation(photo: Uri): PageReading {
-        val reader = PageReader(classifier ?: GlyphClassifier(getApplication()).also { classifier = it })
-        val image = PhotoLoader.load(getApplication<Application>().contentResolver, photo)
-        var best = reader.read(image)
-        for (quarterTurns in 1..3) {
-            if (best.reading.message != null) break
-            val turned = reader.read(image.rotated(quarterTurns))
-            if (turned.reading.message != null || turned.reading.packetsDecoded > best.reading.packetsDecoded) best = turned
-        }
-        return best
     }
 
     private fun PageReading.toState(seconds: Float) =
@@ -115,6 +100,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val problem = PdfComposer(getApplication<Application>().assets).check(text, message.encodeToByteArray())
         _uiState.update { it.copy(write = problem?.let(WriteState::Refused) ?: WriteState.Idle) }
         return problem == null
+    }
+
+    /** Placeholder text long enough for [message], or null (with the reason as the write state) when it is too long. */
+    fun placeholderText(message: String): String? {
+        val bytes = message.encodeToByteArray()
+        if (bytes.size > PdfComposer.MAX_MESSAGE_BYTES) {
+            _uiState.update { it.copy(write = WriteState.Refused(ComposeProblem.MessageTooLong)) }
+            return null
+        }
+        _uiState.update { it.copy(write = WriteState.Idle) }
+        return PdfComposer(getApplication<Application>().assets).placeholderText(bytes)
     }
 
     fun write(text: String, message: String, target: Uri) {

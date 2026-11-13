@@ -27,6 +27,19 @@ class PageReaderTest {
     }
 
     @Test
+    fun `reads a photo that lies on its side or stands on its head`() {
+        // The reference answers only fit the upright page; any other view gets answers that name nothing useful.
+        val blank = FloatArray(GlyphClasses.COUNT).also { it[GlyphClasses.COUNT - 1] = 1f }
+        val reader = PageReader { crops ->
+            if (crops.size == referenceProbabilities.size) referenceProbabilities else List(crops.size) { blank }
+        }
+        for (quarterTurns in 1..3) {
+            val result = reader.read(ScanFixture.image().rotated(quarterTurns))
+            assertEquals("after $quarterTurns quarter turns", "hi", result.reading.message?.decodeToString())
+        }
+    }
+
+    @Test
     fun `names the characters like the Python reference`() {
         // Class 0 is "a" in variant 0; the first class after the varied letters is "l".
         val a = FloatArray(GlyphClasses.COUNT).also { it[0] = 0.4f; it[5] = 0.3f; it[25 * 27] = 0.3f }

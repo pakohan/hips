@@ -28,6 +28,7 @@ fun HipsApp(
     state: UiState,
     onScan: (Uri) -> Unit,
     canWrite: (text: String, message: String) -> Boolean,
+    placeholderText: (message: String) -> String?,
     onWrite: (text: String, message: String, target: Uri) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -45,7 +46,12 @@ fun HipsApp(
             }
             when (AppTab.entries[selected]) {
                 AppTab.SCAN -> ScanScreen(state = state.scan, onScan = onScan)
-                AppTab.WRITE -> WriteScreen(state = state.write, canWrite = canWrite, onWrite = onWrite)
+                AppTab.WRITE -> WriteScreen(
+                    state = state.write,
+                    canWrite = canWrite,
+                    placeholderText = placeholderText,
+                    onWrite = onWrite,
+                )
             }
         }
     }

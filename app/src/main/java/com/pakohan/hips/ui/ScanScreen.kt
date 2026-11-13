@@ -82,6 +82,7 @@ private fun ScanResult(result: ScanState.Done) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (result.message == null) {
                 Text(stringResource(R.string.scan_no_message), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.scan_no_message_hint), style = MaterialTheme.typography.bodyMedium)
             } else {
                 Text(stringResource(R.string.scan_message_title), style = MaterialTheme.typography.labelLarge)
                 SelectionContainer { Text(result.message, style = MaterialTheme.typography.titleLarge) }

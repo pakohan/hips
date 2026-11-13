@@ -60,6 +60,23 @@ itself once that page is printed.
   (`./gradlew :app:connectedReleaseAndroidTest -Phips.testBuildType=release`), and the app starts on the phone.
   How long a scan takes there is still unknown.
 
+- **"No hidden message found" for photos the owner picked** (same day). Checked with one real photo of the
+  14 pt page (`PXL_20261113_111501621.jpg`) pushed through the app's own pipeline on the TV emulator: same
+  x-height (37), lines (30) and symbols (1887) as Python, 30 of 30 packets, message read. So the pipeline is not
+  what failed. Of all photos taken so far only three hold a message this app can read: the 14 pt page
+  `encoded-small-14pt.pdf`, photos `111455351`, `111501621`, `111503455`. The training sheets and
+  `encoded-long.pdf` hold no print-codec message, and the 11 pt page is beyond the app's 14 pt network (5 to 11
+  of 46 packets in Python, one of them with a bogus sequence number). Which photos the owner picked is not known.
+- Reading that real photo took about 5 s per orientation on the emulator (M4 host). The reader therefore no
+  longer runs the network on all four orientations: the segmentation tells sideways from upright (text on its
+  side breaks into many short lines), and the network runs once, or twice when the first reading has no message.
+
+## Added after the first device run
+
+- [x] "Placeholder text" on the Write tab: lorem ipsum long enough to carry the message three times, or to the
+      end of the first page once it fits (`PdfComposer.placeholderText`, `LoremIpsum`).
+- [x] A hint under "No hidden message found" saying which pages can be read.
+
 ## Open
 
 - [ ] Release build with R8: find out why the partial optimisation breaks class access (LiteRT pulls in

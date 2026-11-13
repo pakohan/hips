@@ -45,6 +45,29 @@ class PdfComposer(private val assets: AssetManager, private val format: PageForm
         return if (packetSlots < packetsNeeded) ComposeProblem.TextTooShort(packetsNeeded, packetSlots) else null
     }
 
+    /**
+     * Placeholder text long enough to carry [message] [PLACEHOLDER_COPIES] times: every copy is a
+     * second chance for a packet the reader loses. Stops at the end of the first page as soon as
+     * the message fits once, because a photo shows one page.
+     *
+     * @throws IllegalArgumentException when the message is longer than [MAX_MESSAGE_BYTES].
+     */
+    fun placeholderText(message: ByteArray, random: Random = Random(message.contentHashCode())): String {
+        require(message.size <= MAX_MESSAGE_BYTES) { "message of ${message.size} bytes is too long" }
+        val packetsNeeded = PrintCodec.packetsOf(message).size
+        var text = ""
+        var slots = 0
+        for (sentence in LoremIpsum.sentences(random)) {
+            val longer = if (text.isEmpty()) sentence else "$text $sentence"
+            val lines = layout(longer)
+            val secondPage = lines.last().last().page > 0
+            if (slots >= packetsNeeded * PLACEHOLDER_COPIES || (slots >= packetsNeeded && secondPage)) break
+            text = longer
+            slots = PrintCodec.packetSlots(lineTexts(lines))
+        }
+        return text
+    }
+
     fun compose(text: String, message: ByteArray, output: OutputStream, random: Random = Random.Default): ComposeResult {
         check(text, message)?.let { return ComposeResult.Refused(it) }
         val lines = layout(text)
@@ -97,6 +120,7 @@ class PdfComposer(private val assets: AssetManager, private val format: PageForm
         /** The characters the reader's network was trained to name. */
         const val SUPPORTED = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,;:!?'-()"
         const val MAX_MESSAGE_BYTES = 105
+        const val PLACEHOLDER_COPIES = 3
         private const val BASE_CANDIDATE = 0
     }
 }

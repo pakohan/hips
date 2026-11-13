@@ -10,12 +10,14 @@
     <string name="scan_working">Reading the page…</string>
     <string name="scan_message_title">Hidden message</string>
     <string name="scan_no_message">No hidden message found.</string>
+    <string name="scan_no_message_hint">Only pages written by this app, or with the same codec at 14 pt, carry a message it can read. The whole page must be in the photo, flat and sharp.</string>
     <string name="scan_failed">The photo could not be read: %1$s</string>
     <string name="scan_details">%1$d lines, %2$d characters, letter height %3$.0f px\n%4$d of %5$d packets read, %6$d bits corrected\n%7$.1f s</string>
 
     <string name="write_text_label">Text to print</string>
     <string name="write_message_label">Hidden message</string>
     <string name="write_create">Create PDF</string>
+    <string name="write_placeholder">Placeholder text</string>
     <string name="write_working">Writing the PDF…</string>
     <string name="write_done">PDF written: %1$d page(s). The message needs %2$d packets and fits %3$d times over. Print it at 100%% size.</string>
     <string name="write_unsupported">The text contains characters the HIPS font does not have: %1$s</string>

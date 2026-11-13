@@ -23,6 +23,7 @@ class MainActivity : ComponentActivity() {
                     state = state,
                     onScan = viewModel::scan,
                     canWrite = viewModel::canWrite,
+                    placeholderText = viewModel::placeholderText,
                     onWrite = viewModel::write,
                 )
             }

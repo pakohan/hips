@@ -54,8 +54,32 @@ class PageReading(val reading: Reading, val lines: Int, val symbols: Int, val xH
 
 /** Photo to message: segmentation, the network, then the print codec (ADR 0006). */
 class PageReader(private val scorer: GlyphScorer) {
+    /**
+     * Reads a photo whatever way up it is stored: a phone held flat over a page records no reliable
+     * orientation. Text lying on its side breaks into many short "lines", so the segmentation alone
+     * tells upright or upside down from sideways; the network then runs once, and a second time on
+     * the half-turned photo only when the first reading holds no message.
+     */
     fun read(image: GrayImage): PageReading {
-        val page = Segmenter.segment(image)
+        var quarterTurns = 0
+        var page = Segmenter.segment(image)
+        Segmenter.segment(image.rotated(1)).let { sideways ->
+            if (symbolsPerLine(sideways) > symbolsPerLine(page)) {
+                quarterTurns = 1
+                page = sideways
+            }
+        }
+        val first = read(page)
+        if (first.reading.message != null) return first
+        val halfTurned = read(Segmenter.segment(image.rotated(quarterTurns + 2)))
+        val better = halfTurned.reading.message != null || halfTurned.reading.packetsDecoded > first.reading.packetsDecoded
+        return if (better) halfTurned else first
+    }
+
+    private fun symbolsPerLine(page: SegmentedPage): Float =
+        if (page.lines.isEmpty()) 0f else page.lines.sumOf { it.size }.toFloat() / page.lines.size
+
+    private fun read(page: SegmentedPage): PageReading {
         val symbols = page.lines.flatten()
         val probabilities = scorer.score(symbols.map(page::crop))
 

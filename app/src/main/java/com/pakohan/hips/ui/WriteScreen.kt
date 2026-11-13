@@ -5,6 +5,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -13,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,6 +33,7 @@ import com.pakohan.hips.pdf.ComposeProblem
 fun WriteScreen(
     state: WriteState,
     canWrite: (text: String, message: String) -> Boolean,
+    placeholderText: (message: String) -> String?,
     onWrite: (text: String, message: String, target: Uri) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -59,11 +62,19 @@ fun WriteScreen(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        Button(
-            onClick = { if (canWrite(text, message)) saveAs.launch(fileName) },
-            enabled = !working && text.isNotBlank() && message.isNotEmpty(),
-        ) {
-            Text(stringResource(R.string.write_create))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(
+                onClick = { if (canWrite(text, message)) saveAs.launch(fileName) },
+                enabled = !working && text.isNotBlank() && message.isNotEmpty(),
+            ) {
+                Text(stringResource(R.string.write_create))
+            }
+            OutlinedButton(
+                onClick = { placeholderText(message)?.let { text = it } },
+                enabled = !working && message.isNotEmpty(),
+            ) {
+                Text(stringResource(R.string.write_placeholder))
+            }
         }
         when (state) {
             WriteState.Idle -> Unit

@@ -32,6 +32,20 @@ class PdfComposerOnDeviceTest {
     }
 
     @Test
+    fun placeholderTextFitsTheMessageThreeTimesOrFillsThePage() {
+        for (bytes in listOf(1, 12, 40, 105)) {
+            val message = ByteArray(bytes) { 'x'.code.toByte() }
+            val text = composer.placeholderText(message)
+            val result = composer.compose(text, message, ByteArrayOutputStream())
+            assertTrue("$bytes bytes: $result", result is ComposeResult.Written)
+            result as ComposeResult.Written
+            val copies = result.packetSlots / result.packetsNeeded
+            assertTrue("$bytes bytes: $result", copies in 3..4 || (copies >= 1 && result.pages <= 2))
+            assertTrue("$bytes bytes: $result", result.pages == 1 || result.packetsNeeded > 20)
+        }
+    }
+
+    @Test
     fun refusesWhatCannotBeWritten() {
         val sink = ByteArrayOutputStream()
         assertEquals(
