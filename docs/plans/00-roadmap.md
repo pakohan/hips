@@ -20,13 +20,14 @@ Constraints from the owner (2026-11-12):
 
 | # | Phase | Plan | State |
 |---|---|---|---|
-| 1 | Proof of concept (Python, desktop) | [01-proof-of-concept.md](01-proof-of-concept.md) | in progress |
-| 2 | App scaffolding | not written | not started |
-| 3 | Editing: codec in Kotlin, PDF rewrite, edit UI | not written | not started |
-| 4 | Scanning: camera, segmentation, model on device, scan UI | not written | not started |
+| 1 | Proof of concept (Python, desktop) | [01-proof-of-concept.md](01-proof-of-concept.md) | done for 14 pt print (owner, 2026-11-13: "14 pt is enough"); robustness items stay open there |
+| 2 | App scaffolding | [02-app.md](02-app.md) | waiting for dependency decisions |
+| 3 | Editing: PDF with a hidden message | [02-app.md](02-app.md) | codec in Kotlin done |
+| 4 | Scanning: photo to message on the device | [02-app.md](02-app.md) | network exported to LiteRT |
 
-Phase 3 comes before phase 4 because the codec and the PDF writer can be tested on the JVM against vectors and
-files from the PoC, with no device.
+The owner wants the app on a phone soon to see how it really behaves, so scanning is built first: it is the
+part that cannot be judged on a desktop. Every step below the UI is still tested on the JVM against data from
+the PoC.
 
 ### Phase 2: scaffolding, taken over from the JustWatch project
 

@@ -31,6 +31,9 @@ Run from `poc/`. Everything is written to `build/` (gitignored).
 | 8 | `.venv/bin/python 08_ingest_photos.py real <image>...` | seconds | `dataset-real.npz`: labelled crops from photos of the printed sheets |
 | 9 | `.venv/bin/python 09_train_real.py sheet-03.pdf` | 5 min | `glyphnet-real.pt`: the network trained further on the real crops, tested on the named held-out pages |
 | 10 | `.venv/bin/python 10_small_codebook.py encode [message]`, later `... decode <image>...` | seconds | the print codec (ADR 0006): `encoded-small.pdf` to print, then the message from photos of it |
+| 11 | `HIPS_BUILD=build-s1.0-14pt .venv-export/bin/python 11_export_model.py` | seconds | `glyphnet.tflite` for the app, checked against PyTorch; needs its own venv, see the script |
+
+`tools_export_vectors.py` writes the codec test vectors the Kotlin tests read (`app/src/test/resources/codec/`).
 
 `09_train_real.py none` trains on every real page with nothing held out; that is the network to use for a new
 printed page.

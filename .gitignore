@@ -17,6 +17,7 @@ local.properties
 
 # Python proof of concept: environment and everything it generates (fonts, datasets, model, PDFs)
 /poc/.venv
+/poc/.venv-export
 /poc/build
 /poc/build-*
 /poc/print

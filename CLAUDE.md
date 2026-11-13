@@ -7,8 +7,10 @@ text to reveal one. Everything runs on the device without a network.
 
 Start with `docs/README.md`: roadmap, the current plan with its Open list, and the ADRs.
 
-Package `com.pakohan.hips`, one `:app` Gradle module, Kotlin + Jetpack Compose. The Android code is still the
-empty Studio template; phase 1 (proof of concept) lives in `poc/` as Python and is not part of the Gradle build.
+Package `com.pakohan.hips`, one `:app` Gradle module, Kotlin + Jetpack Compose. The Android side so far is the
+Studio template plus the print codec in `codec/` (pure Kotlin, ADR 0006); the plan is `docs/plans/02-app.md`.
+The proof of concept lives in `poc/` as Python and is not part of the Gradle build; it remains the reference
+implementation, the trainer of the network and the source of test vectors.
 
 ## Build and verify
 
@@ -18,9 +20,9 @@ cd poc && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python test_coding.py            # coding checks, seconds
 .venv/bin/python 05_end_to_end.py          # needs the artefacts of steps 01 to 04 in poc/build/
 
-# Android (template only so far)
+# Android. The shell's Java is 11; run Gradle through Android Studio (its Gradle tool) or with a JDK 17+.
 ./gradlew :app:assembleDebug
-./gradlew :app:testDebugUnitTest
+./gradlew :app:testDebugUnitTest           # codec tests against vectors from poc/tools_export_vectors.py
 ```
 
 `poc/build/` is generated and gitignored (fonts, datasets, model, PDFs). Regenerate it with steps 01 to 04; about
